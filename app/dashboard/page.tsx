@@ -24,13 +24,24 @@ export default function DashboardPage() {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    let active = true
-    authClient.getSession().then((result: Awaited<ReturnType<typeof authClient.getSession>>) => {
-      if (!active) return
-      if (result.error || !result.data.session?.user) location.assign('/sign-in')
-      else setCheckingSession(false)
-    })
-    return () => { active = false }
+    let cancelled = false
+
+    async function checkSession() {
+      const result = await authClient.getSession()
+      if (cancelled) return
+
+      if (result.error || !result.data.session?.user) {
+        window.location.replace('/sign-in')
+        return
+      }
+
+      setCheckingSession(false)
+    }
+
+    void checkSession()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (checkingSession) return <main className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">Checking your session…</main>
