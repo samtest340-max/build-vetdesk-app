@@ -20,17 +20,20 @@ export default function DashboardPage() {
   const [showBooking, setShowBooking] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [created, setCreated] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    let active = true
     authClient.getSession().then(({ data }) => {
+      if (!active) return
       if (!data?.user) location.assign('/sign-in')
       else setCheckingSession(false)
     })
+    return () => { active = false }
   }, [])
 
   if (checkingSession) return <main className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">Checking your session…</main>
-  const [created, setCreated] = useState(false)
-  const [copied, setCopied] = useState(false)
   const publicLink = 'http://localhost:3000/book/dr-adeyemi'
 
   function createAppointment(event: React.FormEvent<HTMLFormElement>) {
