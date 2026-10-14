@@ -1,80 +1,64 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, CheckCircle2, Clock3, Copy, DollarSign, LayoutDashboard, LogOut, Menu, PawPrint, Plus, Search, Settings, Share2, Users, X } from 'lucide-react'
-import { authClient } from '@/lib/auth-client'
+import { CalendarDays, Clock3, LayoutDashboard, LogOut, Menu, PawPrint, Plus, Settings, Share2, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
-const nav = [
-  ['Overview', LayoutDashboard, '/dashboard'], ['Appointments', CalendarDays, '/appointments'], ['Patients', PawPrint, '/patients'], ['Clients', Users, '/dashboard?view=clients'], ['Schedule', Clock3, '/schedule'],
-] as const
-
-const appointments = [
-  { time: '09:00', pet: 'Bella', owner: 'Amaka Okafor', type: 'Vaccination', status: 'Confirmed' },
-  { time: '10:30', pet: 'Max', owner: 'Ibrahim Musa', type: 'Check-up', status: 'Pending' },
-  { time: '12:00', pet: 'Lucky', owner: 'Chioma Eze', type: 'Follow-up', status: 'Confirmed' },
-]
+type Notice = { type: 'success' | 'error'; text: string }
+type Appointment = { id: string; appointment_type: string; starts_at: string; status: string; pet: { name: string } | null }
+const nav = [['Overview', LayoutDashboard, '/dashboard'], ['Appointments', CalendarDays, '/appointments'], ['Patients', PawPrint, '/patients'], ['Schedule', Clock3, '/schedule']] as const
 
 export default function DashboardPage() {
-  const [active, setActive] = useState('Overview')
-  const [showBooking, setShowBooking] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [checkingSession, setCheckingSession] = useState(true)
-  const [created, setCreated] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [showBooking, setShowBooking] = useState(false)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [patientCount, setPatientCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [publicLink, setPublicLink] = useState('')
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function checkSession() {
-      const result = await authClient.getSession()
-      if (cancelled) return
-
-      if (result.error || !result.data.session?.user) {
-        window.location.replace('/sign-in')
-        return
-      }
-
-      setCheckingSession(false)
-    }
-
-    void checkSession()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (checkingSession) return <main className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">Checking your session…</main>
-  const publicLink = 'http://localhost:3000/book/dr-adeyemi'
-
-  function createAppointment(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setCreated(true); setShowBooking(false)
+  async function loadDashboard() {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { window.location.replace('/sign-in'); return }
+    const [appointmentsResult, patientsResult] = await Promise.all([
+      supabase.from('appointments').select('id,appointment_type,starts_at,status,pet:pets(name)').gte('starts_at', new Date().toISOString()).order('starts_at').limit(5),
+      supabase.from('pets').select('id', { count: 'exact', head: true }),
+    ])
+    if (appointmentsResult.error || patientsResult.error) setNotice({ type: 'error', text: 'Unable to load dashboard data.' })
+    setAppointments((appointmentsResult.data ?? []) as unknown as Appointment[])
+    setPatientCount(patientsResult.count ?? 0)
+    setLoading(false)
   }
 
-  const stats: Array<{ label: string; value: string; note: string; Icon: typeof CalendarDays }> = [
-    { label: 'Appointments today', value: '8', note: '+2 from yesterday', Icon: CalendarDays },
-    { label: 'New bookings', value: '12', note: '4 need confirmation', Icon: Users },
-    { label: 'Revenue today', value: '₦86,500', note: '+18.4% this week', Icon: DollarSign },
-    { label: 'Reminders due', value: '6', note: 'Next in 24 minutes', Icon: Clock3 },
-  ]
+  useEffect(() => { setPublicLink(`${window.location.origin}/book/dr-adeyemi`); void loadDashboard() }, [supabase])
+
+  async function createAppointment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setNotice({ type: 'error', text: 'Your session has expired. Please sign in again.' }); return }
+    const { error } = await supabase.from('appointments').insert({ user_id: user.id, appointment_type: String(form.get('appointment_type')), starts_at: new Date(String(form.get('starts_at'))).toISOString(), status: 'pending', notes: String(form.get('notes') || '') || null })
+    if (error) setNotice({ type: 'error', text: 'Unable to save the appointment.' })
+    else { setShowBooking(false); event.currentTarget.reset(); setNotice({ type: 'success', text: 'Appointment saved successfully.' }); void loadDashboard() }
+  }
 
   return <main className="min-h-screen bg-slate-50 text-slate-950">
-    <aside className={`fixed inset-y-0 z-40 w-64 border-r border-slate-200 bg-white p-5 transition-transform lg:flex lg:flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`fixed inset-y-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white p-5 transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <Link href="/" className="flex items-center gap-2 text-xl font-extrabold text-blue-950"><span className="flex size-10 items-center justify-center rounded-xl bg-blue-700 text-white"><PawPrint /></span>Vet<span className="text-blue-600">Desk</span></Link>
       <p className="mt-10 px-3 text-xs font-bold uppercase tracking-widest text-slate-400">Workspace</p>
-      <nav className="mt-3 flex flex-col gap-1">{nav.map(([label, Icon, href]) => href === '/dashboard' || href.includes('view=') ? <Link key={label} href={href} onClick={() => setActive(label)} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${active === label ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}><Icon />{label}</Link> : <Link key={label} href={href} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-500 hover:bg-slate-50"><Icon />{label}</Link>)}</nav>
-      <div className="mt-auto flex flex-col gap-1"><Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-500 hover:bg-slate-50"><Settings />Settings</Link><button onClick={() => authClient.signOut().then(() => location.assign('/'))} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-500"><LogOut />Sign out</button></div>
+      <nav className="mt-3 flex flex-col gap-1">{nav.map(([label, Icon, href]) => <Link key={label} href={href} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700"><Icon />{label}</Link>)}</nav>
+      <div className="mt-auto flex flex-col gap-1"><Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50"><Settings />Settings</Link><button onClick={() => void supabase.auth.signOut().then(() => window.location.assign('/'))} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-600"><LogOut />Sign out</button></div>
     </aside>
-    <section className={`transition-[margin] ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div className="flex items-center gap-3"><button type="button" aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'} onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-xl border border-slate-200 p-2 text-slate-600"><span className="sr-only">{sidebarOpen ? 'Close sidebar' : 'Open sidebar'}</span>{sidebarOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}</button><div><p className="text-sm text-slate-500">Tuesday, 14 October 2026</p><h1 className="text-2xl font-extrabold">Good morning, Doctor</h1></div></div><div className="flex items-center gap-3"><button aria-label="Search" className="hidden rounded-xl border border-slate-200 p-3 text-slate-500 sm:block"><Search /></button><div className="flex size-11 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">DA</div></div></header>
-      <div className="p-5 lg:p-10"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-widest text-blue-700">{active}</p><h2 className="mt-2 text-3xl font-extrabold">{active === 'Overview' ? 'Your practice at a glance' : `${active} workspace`}</h2></div><div className="flex gap-3"><Link href="/book/dr-adeyemi" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold hover:border-blue-300"><Share2 />Public booking page</Link><button onClick={() => setShowBooking(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-800"><Plus />New appointment</button></div></div>
-        {created && <div className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><CheckCircle2 />Appointment saved and confirmation queued for the client and vet.</div>}
-        {active === 'Clients' ? <ClientsLink copied={copied} setCopied={setCopied} publicLink={publicLink} /> : <>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{stats.map(({ label, value, note, Icon }) => <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm text-slate-500">{label}</p><Icon className="text-blue-700" /></div><p className="mt-4 text-3xl font-extrabold">{value}</p><p className="mt-2 text-xs text-slate-500">{note}</p></article>)}</div>
-          <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><div><h3 className="text-lg font-bold">Today&apos;s appointments</h3><p className="mt-1 text-sm text-slate-500">Manage confirmations, notes, and follow-ups.</p></div><button onClick={() => setActive('Appointments')} className="text-sm font-semibold text-blue-700">View calendar →</button></div><div className="mt-5 grid gap-3">{appointments.map((item) => <div key={item.time} className="flex flex-wrap items-center gap-4 rounded-xl bg-slate-50 p-4"><span className="w-14 font-bold text-blue-700">{item.time}</span><span className="flex size-10 items-center justify-center rounded-full bg-blue-100 text-blue-700"><PawPrint /></span><div className="min-w-40 flex-1"><p className="font-bold">{item.pet} <span className="font-normal text-slate-500">· {item.owner}</span></p><p className="text-sm text-slate-500">{item.type}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${item.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.status}</span></div>)}</div></section>
-        </>}
+    <section className={`transition-[margin] ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div className="flex items-center gap-3"><button type="button" aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'} onClick={() => setSidebarOpen(value => !value)} className="rounded-xl border border-slate-200 p-2 text-slate-600">{sidebarOpen ? <X /> : <Menu />}</button><div><p className="text-sm text-slate-500">Practice overview</p><h1 className="text-2xl font-extrabold">Your practice at a glance</h1></div></div><button onClick={() => setShowBooking(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white"><Plus />New appointment</button></header>
+      <div className="p-5 lg:p-10"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="Upcoming appointments" value={loading ? '—' : String(appointments.length)} /><Stat label="Patients" value={loading ? '—' : String(patientCount)} /><Stat label="Pending confirmations" value={loading ? '—' : String(appointments.filter(item => item.status === 'pending').length)} /><Stat label="Calendar connection" value="Settings" /></div>
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Upcoming appointments</h2><p className="mt-1 text-sm text-slate-500">Your saved appointments appear here.</p></div><Link href="/appointments" className="text-sm font-semibold text-blue-700">View all</Link></div>{loading ? <div className="mt-5 grid gap-3">{[1, 2, 3].map(item => <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div> : appointments.length ? <div className="mt-5 grid gap-3">{appointments.map(item => <div key={item.id} className="flex flex-wrap items-center gap-4 rounded-xl bg-slate-50 p-4"><span className="w-36 font-bold text-blue-700">{new Date(item.starts_at).toLocaleString()}</span><PawPrint className="text-blue-700" /><div className="flex-1"><p className="font-bold">{item.pet?.name ?? 'Patient not linked'}</p><p className="text-sm text-slate-500">{item.appointment_type}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">{item.status}</span></div>)}</div> : <div className="mt-5 rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">No appointments yet. <button onClick={() => setShowBooking(true)} className="font-semibold text-blue-700">Add one</button></div>}</section>
+        <section className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6"><div className="flex items-center gap-3"><Share2 className="text-blue-700" /><div><h2 className="font-bold">Public booking page</h2><p className="text-sm text-slate-600">Share your booking link with clients.</p></div></div><div className="mt-4 flex gap-2"><input readOnly value={publicLink} className="min-w-0 flex-1 rounded-xl border border-blue-200 bg-white px-3 text-sm" /><button onClick={() => { void navigator.clipboard?.writeText(publicLink); setNotice({ type: 'success', text: 'Booking link copied.' }) }} className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Copy</button></div></section>
       </div></section>
-    {showBooking && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-5"><form onSubmit={createAppointment} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><h2 className="text-xl font-extrabold">New appointment</h2><p className="text-sm text-slate-500">Add a booking to today&apos;s schedule.</p></div><button type="button" onClick={() => setShowBooking(false)} aria-label="Close"><X /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-semibold">Pet name<input required className="h-11 rounded-xl border border-slate-200 px-3" placeholder="Bella" /></label><label className="grid gap-2 text-sm font-semibold">Owner name<input required className="h-11 rounded-xl border border-slate-200 px-3" placeholder="Client name" /></label><label className="grid gap-2 text-sm font-semibold">Service<select className="h-11 rounded-xl border border-slate-200 px-3"><option>Consultation</option><option>Vaccination</option><option>Surgery</option><option>Follow-up</option><option>Emergency</option><option>Teleconsultation</option></select></label><label className="grid gap-2 text-sm font-semibold">Date and time<input required type="datetime-local" className="h-11 rounded-xl border border-slate-200 px-3" /></label></div><button className="mt-6 w-full rounded-xl bg-blue-700 py-3 font-semibold text-white hover:bg-blue-800">Save appointment</button></form></div>}
+    {notice && <div role="status" className={`fixed bottom-5 right-5 z-50 rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg ${notice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>{notice.text}<button onClick={() => setNotice(null)} className="ml-4" aria-label="Dismiss notification">×</button></div>}
+    {showBooking && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-5"><form onSubmit={createAppointment} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold">New appointment</h2><button type="button" onClick={() => setShowBooking(false)} aria-label="Close"><X /></button></div><div className="mt-6 grid gap-4"><label className="grid gap-2 text-sm font-semibold">Appointment type<input name="appointment_type" required className="h-11 rounded-xl border px-3" /></label><label className="grid gap-2 text-sm font-semibold">Date and time<input name="starts_at" required type="datetime-local" className="h-11 rounded-xl border px-3" /></label><label className="grid gap-2 text-sm font-semibold">Notes<textarea name="notes" className="rounded-xl border px-3 py-2" /></label></div><button className="mt-6 w-full rounded-xl bg-blue-700 py-3 font-semibold text-white">Save appointment</button></form></div>}
   </main>
 }
-
-function ClientsLink({ copied, setCopied, publicLink }: { copied: boolean; setCopied: (value: boolean) => void; publicLink: string }) { return <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.2fr]"><article className="rounded-2xl border border-blue-100 bg-blue-50 p-6"><p className="text-sm font-bold uppercase tracking-widest text-blue-700">Share with clients</p><h3 className="mt-3 text-2xl font-extrabold">Your public booking page</h3><p className="mt-3 text-sm leading-6 text-slate-600">Clients can see your profile, services, availability, and book without creating an account.</p><div className="mt-5 flex gap-2"><input readOnly value={publicLink} className="min-w-0 flex-1 rounded-xl border border-blue-200 bg-white px-3 text-sm"/><button onClick={() => { navigator.clipboard?.writeText(publicLink); setCopied(true) }} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white"><Copy />{copied ? 'Copied' : 'Copy'}</button></div><Link href="/book/dr-adeyemi" className="mt-4 inline-flex text-sm font-bold text-blue-700">Preview page →</Link></article><article className="rounded-2xl border border-slate-200 bg-white p-6"><h3 className="font-bold">Recent clients</h3><div className="mt-4 grid gap-3">{['Amaka Okafor · 2 pets','Ibrahim Musa · 1 pet','Chioma Eze · 3 pets'].map((client) => <div key={client} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><span className="flex size-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">{client[0]}</span><span className="text-sm font-semibold">{client}</span></div>)}</div></article></section> }
+function Stat({ label, value }: { label: string; value: string }) { return <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-4 text-3xl font-extrabold">{value}</p></article> }
