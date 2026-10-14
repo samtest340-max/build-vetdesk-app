@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, CheckCircle2, Clock3, Copy, DollarSign, LayoutDashboard, LogOut, PawPrint, Plus, Search, Settings, Share2, Users, X } from 'lucide-react'
+import { CalendarDays, CheckCircle2, Clock3, Copy, DollarSign, LayoutDashboard, LogOut, Menu, PawPrint, Plus, Search, Settings, Share2, Users, X } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 const nav = [
@@ -18,6 +18,17 @@ const appointments = [
 export default function DashboardPage() {
   const [active, setActive] = useState('Overview')
   const [showBooking, setShowBooking] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    authClient.getSession().then(({ data }) => {
+      if (!data?.user) location.assign('/sign-in')
+      else setCheckingSession(false)
+    })
+  }, [])
+
+  if (checkingSession) return <main className="grid min-h-screen place-items-center bg-slate-50 text-sm text-slate-500">Checking your session…</main>
   const [created, setCreated] = useState(false)
   const [copied, setCopied] = useState(false)
   const publicLink = 'http://localhost:3000/book/dr-adeyemi'
@@ -26,18 +37,25 @@ export default function DashboardPage() {
     event.preventDefault(); setCreated(true); setShowBooking(false)
   }
 
+  const stats: Array<{ label: string; value: string; note: string; Icon: typeof CalendarDays }> = [
+    { label: 'Appointments today', value: '8', note: '+2 from yesterday', Icon: CalendarDays },
+    { label: 'New bookings', value: '12', note: '4 need confirmation', Icon: Users },
+    { label: 'Revenue today', value: '₦86,500', note: '+18.4% this week', Icon: DollarSign },
+    { label: 'Reminders due', value: '6', note: 'Next in 24 minutes', Icon: Clock3 },
+  ]
+
   return <main className="min-h-screen bg-slate-50 text-slate-950">
-    <aside className="fixed inset-y-0 hidden w-64 border-r border-slate-200 bg-white p-5 lg:flex lg:flex-col">
+    <aside className={`fixed inset-y-0 z-40 w-64 border-r border-slate-200 bg-white p-5 transition-transform lg:flex lg:flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <Link href="/" className="flex items-center gap-2 text-xl font-extrabold text-blue-950"><span className="flex size-10 items-center justify-center rounded-xl bg-blue-700 text-white"><PawPrint /></span>Vet<span className="text-blue-600">Desk</span></Link>
       <p className="mt-10 px-3 text-xs font-bold uppercase tracking-widest text-slate-400">Workspace</p>
       <nav className="mt-3 flex flex-col gap-1">{nav.map(([label, Icon, href]) => href === '/dashboard' || href.includes('view=') ? <Link key={label} href={href} onClick={() => setActive(label)} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${active === label ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}><Icon />{label}</Link> : <Link key={label} href={href} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-500 hover:bg-slate-50"><Icon />{label}</Link>)}</nav>
       <div className="mt-auto flex flex-col gap-1"><Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-500 hover:bg-slate-50"><Settings />Settings</Link><button onClick={() => authClient.signOut().then(() => location.assign('/'))} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-500"><LogOut />Sign out</button></div>
     </aside>
-    <section className="lg:ml-64"><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div><p className="text-sm text-slate-500">Tuesday, 14 October 2026</p><h1 className="text-2xl font-extrabold">Good morning, Doctor</h1></div><div className="flex items-center gap-3"><button aria-label="Search" className="hidden rounded-xl border border-slate-200 p-3 text-slate-500 sm:block"><Search /></button><div className="flex size-11 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">DA</div></div></header>
+    <section className={`transition-[margin] ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div className="flex items-center gap-3"><button type="button" aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'} onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-xl border border-slate-200 p-2 text-slate-600"><span className="sr-only">{sidebarOpen ? 'Close sidebar' : 'Open sidebar'}</span>{sidebarOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}</button><div><p className="text-sm text-slate-500">Tuesday, 14 October 2026</p><h1 className="text-2xl font-extrabold">Good morning, Doctor</h1></div></div><div className="flex items-center gap-3"><button aria-label="Search" className="hidden rounded-xl border border-slate-200 p-3 text-slate-500 sm:block"><Search /></button><div className="flex size-11 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">DA</div></div></header>
       <div className="p-5 lg:p-10"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-widest text-blue-700">{active}</p><h2 className="mt-2 text-3xl font-extrabold">{active === 'Overview' ? 'Your practice at a glance' : `${active} workspace`}</h2></div><div className="flex gap-3"><Link href="/book/dr-adeyemi" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold hover:border-blue-300"><Share2 />Public booking page</Link><button onClick={() => setShowBooking(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-800"><Plus />New appointment</button></div></div>
         {created && <div className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><CheckCircle2 />Appointment saved and confirmation queued for the client and vet.</div>}
         {active === 'Clients' ? <ClientsLink copied={copied} setCopied={setCopied} publicLink={publicLink} /> : <>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[['Appointments today','8','+2 from yesterday',CalendarDays],['New bookings','12','4 need confirmation',Users],['Revenue today','₦86,500','+18.4% this week',DollarSign],['Reminders due','6','Next in 24 minutes',Clock3]].map(([label, value, note, Icon]) => <article key={label as string} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm text-slate-500">{label}</p><Icon className="text-blue-700" /></div><p className="mt-4 text-3xl font-extrabold">{value}</p><p className="mt-2 text-xs text-slate-500">{note}</p></article>)}</div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{stats.map(({ label, value, note, Icon }) => <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm text-slate-500">{label}</p><Icon className="text-blue-700" /></div><p className="mt-4 text-3xl font-extrabold">{value}</p><p className="mt-2 text-xs text-slate-500">{note}</p></article>)}</div>
           <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><div><h3 className="text-lg font-bold">Today&apos;s appointments</h3><p className="mt-1 text-sm text-slate-500">Manage confirmations, notes, and follow-ups.</p></div><button onClick={() => setActive('Appointments')} className="text-sm font-semibold text-blue-700">View calendar →</button></div><div className="mt-5 grid gap-3">{appointments.map((item) => <div key={item.time} className="flex flex-wrap items-center gap-4 rounded-xl bg-slate-50 p-4"><span className="w-14 font-bold text-blue-700">{item.time}</span><span className="flex size-10 items-center justify-center rounded-full bg-blue-100 text-blue-700"><PawPrint /></span><div className="min-w-40 flex-1"><p className="font-bold">{item.pet} <span className="font-normal text-slate-500">· {item.owner}</span></p><p className="text-sm text-slate-500">{item.type}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${item.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.status}</span></div>)}</div></section>
         </>}
       </div></section>
