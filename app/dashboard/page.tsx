@@ -25,9 +25,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let active = true
-    authClient.getSession().then(({ data }) => {
+    authClient.getSession().then((result: Awaited<ReturnType<typeof authClient.getSession>>) => {
       if (!active) return
-      if (!data?.user) location.assign('/sign-in')
+      if (result.error || !result.data.session?.user) location.assign('/sign-in')
       else setCheckingSession(false)
     })
     return () => { active = false }
