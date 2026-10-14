@@ -51,8 +51,8 @@ export default function Page() {
           </nav>
           <div className="hidden items-center gap-3 md:flex">
             <button onClick={() => setDark(!dark)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Toggle dark mode">{dark ? <Sun /> : <Moon />}</button>
-            <a href="#pricing" className="px-3 text-sm font-medium text-slate-700 dark:text-slate-300">Log in</a>
-            <a href="#pricing" className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-blue-700 px-5 text-sm font-medium text-white hover:bg-blue-800">Get Started Free <ArrowRight data-icon="inline-end" /></a>
+<a href="/sign-in" className="px-3 text-sm font-medium text-slate-700 dark:text-slate-300">Log in</a>
+  <a href="/sign-up" className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-blue-700 px-5 text-sm font-medium text-white hover:bg-blue-800">Get Started Free <ArrowRight data-icon="inline-end" /></a>
           </div>
           <button className="rounded-lg p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">{menuOpen ? <X /> : <Menu />}</button>
         </div>
