@@ -18,6 +18,16 @@ export async function GET() {
   return NextResponse.json(data)
 }
 
+export async function DELETE(request: Request) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const body = await request.json() as { id?: string }
+  if (!body.id) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  const { error } = await createAdminClient().auth.admin.deleteUser(body.id)
+  if (error) return NextResponse.json({ error: 'Could not remove user' }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
 export async function PATCH(request: Request) {
   const admin = await requireAdmin()
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
