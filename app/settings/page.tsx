@@ -15,9 +15,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
 
   useEffect(() => {
+    if (!supabase) return
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.replace('/sign-in'); return }
@@ -34,6 +35,7 @@ export default function SettingsPage() {
   }, [supabase])
 
   async function save() {
+    if (!supabase) { setNotice({ type: 'error', text: 'The settings service is unavailable.' }); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setNotice({ type: 'error', text: 'Your session has expired.' }); setSaving(false); return }

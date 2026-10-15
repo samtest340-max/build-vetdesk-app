@@ -17,19 +17,20 @@ export default function PatientsPage() {
   const [showForm, setShowForm] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
 
   async function loadPatients() {
+    if (!supabase) return
     const { data, error } = await supabase.from('pets').select('id,name,species,breed,owner_name,owner_email,owner_phone,owner_address,weight,notes,photo_url').order('created_at', { ascending: false })
     if (error) setNotice({ type: 'error', text: 'Unable to load patient records.' })
     else { setPatients(data ?? []); setSelected(current => current ?? data?.[0] ?? null) }
     setLoading(false)
   }
-  useEffect(() => { void loadPatients(); const channel = supabase.channel('patients-live').on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => void loadPatients()).subscribe(); return () => { void supabase.removeChannel(channel) } }, [supabase])
+  useEffect(() => { if (!supabase) return; void loadPatients(); const channel = supabase.channel('patients-live').on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => void loadPatients()).subscribe(); return () => { void supabase.removeChannel(channel) } }, [supabase])
 
   const filtered = useMemo(() => patients.filter(patient => Object.values(patient).join(' ').toLowerCase().includes(query.toLowerCase())), [patients, query])
   async function addPatient(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = new FormData(event.currentTarget); const { data: { user } } = await supabase.auth.getUser()
+    event.preventDefault(); if (!supabase) { setNotice({ type: 'error', text: 'The patient service is unavailable.' }); return } const form = new FormData(event.currentTarget); const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setNotice({ type: 'error', text: 'Your session has expired. Please sign in again.' }); return }
     const { error } = await supabase.from('pets').insert({ user_id: user.id, name: String(form.get('name')), species: String(form.get('species')), breed: String(form.get('breed') || '') || null, owner_name: String(form.get('owner_name')), owner_email: String(form.get('owner_email') || '') || null, owner_phone: String(form.get('owner_phone') || '') || null, owner_address: String(form.get('owner_address') || '') || null, weight: String(form.get('weight') || '') || null, notes: String(form.get('notes') || '') || null })
     if (error) setNotice({ type: 'error', text: 'Unable to save this patient.' }); else { setShowForm(false); event.currentTarget.reset(); setNotice({ type: 'success', text: 'Patient saved successfully.' }); await loadPatients() }
