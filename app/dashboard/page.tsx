@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, Clock3, LayoutDashboard, LogOut, Menu, PawPrint, Plus, Settings, Share2, X } from 'lucide-react'
@@ -17,12 +19,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [publicLink, setPublicLink] = useState('')
+  const [displayName, setDisplayName] = useState('there')
   const supabase = useMemo(() => createClient(), [])
 
   async function loadDashboard() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { window.location.replace('/sign-in'); return }
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+    setDisplayName(profile?.full_name?.trim() || user.email?.split('@')[0] || 'there')
     const [appointmentsResult, patientsResult] = await Promise.all([
       supabase.from('appointments').select('id,appointment_type,starts_at,status,pet:pets(name)').gte('starts_at', new Date().toISOString()).order('starts_at').limit(5),
       supabase.from('pets').select('id', { count: 'exact', head: true }),
@@ -33,7 +38,12 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
-  useEffect(() => { setPublicLink(`${window.location.origin}/book/dr-adeyemi`); void loadDashboard() }, [supabase])
+  useEffect(() => {
+    setPublicLink(`${window.location.origin}/book/dr-adeyemi`)
+    void loadDashboard()
+    const channel = supabase.channel('dashboard-live').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => void loadDashboard()).on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => void loadDashboard()).subscribe()
+    return () => { void supabase.removeChannel(channel) }
+  }, [supabase])
 
   async function createAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,7 +62,7 @@ export default function DashboardPage() {
       <nav className="mt-3 flex flex-col gap-1">{nav.map(([label, Icon, href]) => <Link key={label} href={href} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700"><Icon />{label}</Link>)}</nav>
       <div className="mt-auto flex flex-col gap-1"><Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50"><Settings />Settings</Link><button onClick={() => void supabase.auth.signOut().then(() => window.location.assign('/'))} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-600"><LogOut />Sign out</button></div>
     </aside>
-    <section className={`transition-[margin] ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div className="flex items-center gap-3"><button type="button" aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'} onClick={() => setSidebarOpen(value => !value)} className="rounded-xl border border-slate-200 p-2 text-slate-600">{sidebarOpen ? <X /> : <Menu />}</button><div><p className="text-sm text-slate-500">Practice overview</p><h1 className="text-2xl font-extrabold">Your practice at a glance</h1></div></div><button onClick={() => setShowBooking(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white"><Plus />New appointment</button></header>
+    <section className={`transition-[margin] ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div className="flex items-center gap-3"><button type="button" aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'} onClick={() => setSidebarOpen(value => !value)} className="rounded-xl border border-slate-200 p-2 text-slate-600">{sidebarOpen ? <X /> : <Menu />}</button><div><p className="eyebrow">Practice overview</p><h1 className="text-2xl font-extrabold">Good day, {displayName}</h1></div></div><button onClick={() => setShowBooking(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white"><Plus />New appointment</button></header>
       <div className="p-5 lg:p-10"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="Upcoming appointments" value={loading ? '—' : String(appointments.length)} /><Stat label="Patients" value={loading ? '—' : String(patientCount)} /><Stat label="Pending confirmations" value={loading ? '—' : String(appointments.filter(item => item.status === 'pending').length)} /><Stat label="Calendar connection" value="Settings" /></div>
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Upcoming appointments</h2><p className="mt-1 text-sm text-slate-500">Your saved appointments appear here.</p></div><Link href="/appointments" className="text-sm font-semibold text-blue-700">View all</Link></div>{loading ? <div className="mt-5 grid gap-3">{[1, 2, 3].map(item => <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div> : appointments.length ? <div className="mt-5 grid gap-3">{appointments.map(item => <div key={item.id} className="flex flex-wrap items-center gap-4 rounded-xl bg-slate-50 p-4"><span className="w-36 font-bold text-blue-700">{new Date(item.starts_at).toLocaleString()}</span><PawPrint className="text-blue-700" /><div className="flex-1"><p className="font-bold">{item.pet?.name ?? 'Patient not linked'}</p><p className="text-sm text-slate-500">{item.appointment_type}</p></div><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">{item.status}</span></div>)}</div> : <div className="mt-5 rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">No appointments yet. <button onClick={() => setShowBooking(true)} className="font-semibold text-blue-700">Add one</button></div>}</section>
         <section className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-6"><div className="flex items-center gap-3"><Share2 className="text-blue-700" /><div><h2 className="font-bold">Public booking page</h2><p className="text-sm text-slate-600">Share your booking link with clients.</p></div></div><div className="mt-4 flex gap-2"><input readOnly value={publicLink} className="min-w-0 flex-1 rounded-xl border border-blue-200 bg-white px-3 text-sm" /><button onClick={() => { void navigator.clipboard?.writeText(publicLink); setNotice({ type: 'success', text: 'Booking link copied.' }) }} className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Copy</button></div></section>

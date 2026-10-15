@@ -153,6 +153,12 @@
   }
 }
 
+.glass-panel { background: rgb(255 255 255 / 0.76); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 10px 35px rgb(15 23 42 / 0.06); }
+.glass-card { background: rgb(255 255 255 / 0.66); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgb(255 255 255 / 0.78); border-radius: 1.25rem; box-shadow: 0 18px 45px rgb(30 64 175 / 0.08), inset 0 1px rgb(255 255 255 / 0.9); }
+.button-primary { display: inline-flex; align-items: center; gap: .5rem; border-radius: .8rem; background: linear-gradient(135deg,#1d4ed8,#2563eb); color: white; padding: .75rem 1rem; font-size: .875rem; font-weight: 700; box-shadow: 0 8px 18px rgb(37 99 235 / .24), inset 0 1px rgb(255 255 255 / .25); transition: transform .2s, box-shadow .2s; }
+.button-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgb(37 99 235 / .3), inset 0 1px rgb(255 255 255 / .25); }
+.eyebrow { color: #2563eb; font-size: .7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
