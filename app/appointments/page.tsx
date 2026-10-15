@@ -41,7 +41,7 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     if (!supabase) return
-    void supabase.from('pets').select('id,name,species').order('name').then(({ data }) => setPatients((data ?? []) as Patient[]))
+    void supabase.from('pets').select('id,name,species').order('name').then(({ data }: { data: Patient[] | null }) => setPatients(data ?? []))
   }, [supabase])
 
   async function createAppointment(event: FormEvent<HTMLFormElement>) {
