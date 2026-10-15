@@ -19,9 +19,10 @@ export default function DashboardPage() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [publicLink, setPublicLink] = useState('')
   const [displayName, setDisplayName] = useState('there')
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
 
   async function loadDashboard() {
+    if (!supabase) return
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { window.location.replace('/sign-in'); return }
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    if (!supabase) return
     setPublicLink(`${window.location.origin}/book/dr-adeyemi`)
     void loadDashboard()
     const channel = supabase.channel('dashboard-live').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => void loadDashboard()).on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => void loadDashboard()).subscribe()
@@ -49,7 +51,7 @@ export default function DashboardPage() {
       <Link href="/" className="flex items-center gap-2 text-xl font-extrabold text-blue-950"><span className="flex size-10 items-center justify-center rounded-xl bg-blue-700 text-white"><PawPrint /></span>Vet<span className="text-blue-600">Desk</span></Link>
       <p className="mt-10 px-3 text-xs font-bold uppercase tracking-widest text-slate-400">Workspace</p>
       <nav className="mt-3 flex flex-col gap-1">{nav.map(([label, Icon, href]) => <Link key={label} href={href} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-700"><Icon />{label}</Link>)}</nav>
-      <div className="mt-auto flex flex-col gap-1"><Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50"><Settings />Settings</Link><button onClick={() => void supabase.auth.signOut().then(() => window.location.assign('/'))} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-600"><LogOut />Sign out</button></div>
+      <div className="mt-auto flex flex-col gap-1"><Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-600 hover:bg-blue-50"><Settings />Settings</Link><button onClick={() => { if (supabase) void supabase.auth.signOut().then(() => window.location.assign('/')) }} className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-600"><LogOut />Sign out</button></div>
     </aside>
     <section className={`transition-[margin] ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div className="flex items-center gap-3"><button type="button" aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'} onClick={() => setSidebarOpen(value => !value)} className="rounded-xl border border-slate-200 p-2 text-slate-600">{sidebarOpen ? <X /> : <Menu />}</button><div><p className="eyebrow">Practice overview</p><h1 className="text-2xl font-extrabold">Good day, {displayName}</h1></div></div></header>
       <div className="p-5 lg:p-10"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="Upcoming appointments" value={loading ? '—' : String(appointments.length)} /><Stat label="Patients" value={loading ? '—' : String(patientCount)} /><Stat label="Pending confirmations" value={loading ? '—' : String(appointments.filter(item => item.status === 'pending').length)} /><Stat label="Calendar connection" value="Settings" /></div>

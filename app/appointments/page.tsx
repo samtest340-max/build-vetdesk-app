@@ -11,7 +11,7 @@ type Notice = { type: 'success' | 'error'; text: string }
 const services = ['Wellness examination', 'Vaccination', 'Dental cleaning', 'Surgery', 'Emergency visit', 'Diagnostics and laboratory tests', 'Parasite prevention', 'Microchipping', 'Grooming', 'Nutrition consultation', 'Follow-up visit']
 
 export default function AppointmentsPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
   const [date, setDate] = useState(() => new Date())
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
@@ -22,6 +22,7 @@ export default function AppointmentsPage() {
   const dateKey = date.toISOString().slice(0, 10)
 
   async function loadAppointments() {
+    if (!supabase) return
     setLoading(true)
     const start = new Date(`${dateKey}T00:00:00`).toISOString()
     const end = new Date(`${dateKey}T23:59:59`).toISOString()
@@ -32,17 +33,20 @@ export default function AppointmentsPage() {
   }
 
   useEffect(() => {
+    if (!supabase) return
     void loadAppointments()
     const channel = supabase.channel('appointments-live').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => void loadAppointments()).subscribe()
     return () => { void supabase.removeChannel(channel) }
   }, [dateKey, supabase])
 
   useEffect(() => {
+    if (!supabase) return
     void supabase.from('pets').select('id,name,species').order('name').then(({ data }) => setPatients((data ?? []) as Patient[]))
   }, [supabase])
 
   async function createAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!supabase) return setNotice({ type: 'error', text: 'The appointment service is unavailable.' })
     const form = new FormData(event.currentTarget)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return setNotice({ type: 'error', text: 'Please sign in again.' })
@@ -52,6 +56,7 @@ export default function AppointmentsPage() {
   }
 
   async function updateStatus(id: string, status: 'pending' | 'approved') {
+    if (!supabase) return setNotice({ type: 'error', text: 'The appointment service is unavailable.' })
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
     if (error) setNotice({ type: 'error', text: 'Unable to update appointment status.' })
     else { setAppointments(items => items.map(item => item.id === id ? { ...item, status } : item)); setNotice({ type: 'success', text: `Appointment ${status}.` }) }
