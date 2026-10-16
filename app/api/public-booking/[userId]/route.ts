@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { lagosDateKey, validateBooking } from '@/lib/appointments/booking-rules'
 
 export async function GET(_request: Request, context: { params: Promise<{ userId: string }> }) {
   const { userId } = await context.params
   const admin = createAdminClient()
   const [{ data: profile, error: profileError }, { data: appointments, error: appointmentsError }] = await Promise.all([
     admin.from('profiles').select('id,full_name,clinic_name,specialization').eq('id', userId).maybeSingle(),
-    admin.from('appointments').select('starts_at,status').eq('user_id', userId).eq('status', 'approved').gte('starts_at', new Date().toISOString()).order('starts_at'),
+    admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date().toISOString()).order('starts_at'),
   ])
   if (profileError || !profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
   if (appointmentsError) return NextResponse.json({ error: 'Unable to load availability.' }, { status: 500 })
@@ -22,8 +23,10 @@ export async function POST(request: Request, context: { params: Promise<{ userId
   const admin = createAdminClient()
   const { data: profile } = await admin.from('profiles').select('id').eq('id', userId).maybeSingle()
   if (!profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
-  const { data: conflicting } = await admin.from('appointments').select('id').eq('user_id', userId).eq('status', 'approved').eq('starts_at', startsAt.toISOString()).maybeSingle()
-  if (conflicting) return NextResponse.json({ error: 'That time is already booked. Please choose another.' }, { status: 409 })
+  const dateKey = lagosDateKey(startsAt)
+  const { data: existing, error: existingError } = await admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date(`${dateKey}T00:00:00Z`).toISOString()).lt('starts_at', new Date(`${dateKey}T23:59:59Z`).toISOString())
+  if (existingError) return NextResponse.json({ error: 'Unable to verify availability.' }, { status: 500 })
+  if (!validateBooking(dateKey, startsAt.toISOString(), existing ?? [])) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
   const notes = [`External booking: ${body.name}`, `Email: ${body.email}`, body.phone ? `Phone: ${body.phone}` : '', body.notes ? `Notes: ${body.notes}` : ''].filter(Boolean).join('\n')
   const { error } = await admin.from('appointments').insert({ user_id: userId, pet_id: null, appointment_type: body.appointmentType, starts_at: startsAt.toISOString(), status: 'pending', notes })
   if (error) return NextResponse.json({ error: 'Unable to submit booking.' }, { status: 500 })
