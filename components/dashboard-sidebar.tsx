@@ -1,13 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { CalendarDays, Clock3, LayoutDashboard, MessageSquarePlus, PawPrint, Settings } from 'lucide-react'
+import { CalendarDays, CalendarHeart, Clock3, LayoutDashboard, MessageSquarePlus, PawPrint, Settings } from 'lucide-react'
 
 const nav = [
   ['Overview', LayoutDashboard, '/dashboard'],
   ['Appointments', CalendarDays, '/appointments'],
   ['Patients', PawPrint, '/patients'],
-  ['Schedule', Clock3, '/schedule'],
+  ['Schedule', Clock3, '/schedule'], ['Care', CalendarHeart, '/care'],
   ['Feedback', MessageSquarePlus, '/feedback'],
 ] as const
 
