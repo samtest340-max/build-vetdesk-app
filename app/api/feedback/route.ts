@@ -35,8 +35,15 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE() {
-  return NextResponse.json({ error: 'Not supported' }, { status: 405 })
+export async function DELETE(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const body = await request.json().catch(() => ({})) as { id?: string }
+  if (!body.id) return NextResponse.json({ error: 'Request id is required' }, { status: 400 })
+  const { error } = await supabase.from('feedback_requests').delete().eq('id', body.id).eq('user_id', user.id)
+  if (error) return NextResponse.json({ error: 'Unable to delete request' }, { status: 500 })
+  return NextResponse.json({ ok: true })
 } 
 
 export const dynamic = 'force-dynamic'
