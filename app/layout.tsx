@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { DashboardShell } from '@/components/dashboard-shell'
 
 export const metadata: Metadata = {
   title: 'VetDesk — Run your vet practice. Fill your calendar.',
@@ -41,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {children}
+        <DashboardShell>{children}</DashboardShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
