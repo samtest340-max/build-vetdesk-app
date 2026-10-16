@@ -24,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ userId
   const { data: profile } = await admin.from('profiles').select('id').eq('id', userId).maybeSingle()
   if (!profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
   const dateKey = lagosDateKey(startsAt)
-  const { data: existing, error: existingError } = await admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date(`${dateKey}T00:00:00Z`).toISOString()).lt('starts_at', new Date(`${dateKey}T23:59:59Z`).toISOString())
+  const { data: existing, error: existingError } = await admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date(`${dateKey}T00:00:00+01:00`).toISOString()).lt('starts_at', new Date(`${dateKey}T23:59:59+01:00`).toISOString())
   if (existingError) return NextResponse.json({ error: 'Unable to verify availability.' }, { status: 500 })
   if (!validateBooking(dateKey, startsAt.toISOString(), existing ?? [])) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
   const notes = [`External booking: ${body.name}`, `Email: ${body.email}`, body.phone ? `Phone: ${body.phone}` : '', body.notes ? `Notes: ${body.notes}` : ''].filter(Boolean).join('\n')
