@@ -11,7 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ userId
   ])
   if (profileError || !profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
   if (appointmentsError) return NextResponse.json({ error: 'Unable to load availability.' }, { status: 500 })
-  return NextResponse.json({ profile, blockedSlots: (appointments ?? []).map(item => item.starts_at) })
+  return NextResponse.json({ profile, blockedSlots: appointments ?? [] })
 }
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
