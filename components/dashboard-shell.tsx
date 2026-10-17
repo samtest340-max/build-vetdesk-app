@@ -8,6 +8,6 @@ const dashboardRoutes = ['/dashboard', '/appointments', '/patients', '/schedule'
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isDashboardRoute = dashboardRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`))
-  if (!isDashboardRoute) return <>{children}</>
-  return <div className="min-h-screen lg:pl-64"><DashboardSidebar /><main className="min-h-screen">{children}</main></div>
+  const content = isDashboardRoute ? <div className="min-h-screen lg:pl-64"><DashboardSidebar /><main className="min-h-screen">{children}</main></div> : children
+  return <div key={pathname} className="route-transition">{content}</div>
 }

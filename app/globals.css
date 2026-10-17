@@ -162,6 +162,18 @@
 .button-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgb(37 99 235 / .3), inset 0 1px rgb(255 255 255 / .25); }
 .eyebrow { color: #2563eb; font-size: .7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 
+@keyframes route-enter-3d {
+  from { opacity: 0; transform: perspective(1400px) rotateX(2deg) rotateY(-1.5deg) translate3d(0, 18px, -28px) scale(.985); transform-origin: 50% 0; }
+  to { opacity: 1; transform: perspective(1400px) rotateX(0) rotateY(0) translate3d(0, 0, 0) scale(1); }
+}
+.route-transition { min-height: 100vh; transform-style: preserve-3d; animation: route-enter-3d .48s cubic-bezier(.22, .8, .24, 1) both; }
+.route-transition a, .route-transition button { transition: transform .2s cubic-bezier(.22, .8, .24, 1), box-shadow .2s ease, background-color .2s ease, color .2s ease; }
+.route-transition a:active, .route-transition button:active { transform: translateY(1px) scale(.98); }
+@media (prefers-reduced-motion: reduce) {
+  .route-transition { animation: none; }
+  .route-transition a, .route-transition button { transition: none; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
