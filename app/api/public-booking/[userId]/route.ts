@@ -5,13 +5,14 @@ import { lagosDateKey, validateBooking } from '@/lib/appointments/booking-rules'
 export async function GET(_request: Request, context: { params: Promise<{ userId: string }> }) {
   const { userId } = await context.params
   const admin = createAdminClient()
-  const [{ data: profile, error: profileError }, { data: appointments, error: appointmentsError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: appointments, error: appointmentsError }, { data: services, error: servicesError }] = await Promise.all([
     admin.from('profiles').select('id,full_name,clinic_name,specialization').eq('id', userId).maybeSingle(),
     admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date().toISOString()).order('starts_at'),
+    admin.from('services').select('id,name,fee').eq('user_id', userId).order('name'),
   ])
   if (profileError || !profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
-  if (appointmentsError) return NextResponse.json({ error: 'Unable to load availability.' }, { status: 500 })
-  return NextResponse.json({ profile, blockedSlots: appointments ?? [] })
+  if (appointmentsError || servicesError) return NextResponse.json({ error: 'Unable to load booking details.' }, { status: 500 })
+  return NextResponse.json({ profile, blockedSlots: appointments ?? [], services: services ?? [] })
 }
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
