@@ -44,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <div className="fixed right-4 top-4 z-50"><PwaInstallButton /></div>
+        <div className="pointer-events-none fixed right-4 top-20 z-50"><div className="pointer-events-auto"><PwaInstallButton /></div></div>
         <DashboardShell>{children}</DashboardShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
