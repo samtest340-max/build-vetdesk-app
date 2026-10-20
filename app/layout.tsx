@@ -2,11 +2,13 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { DashboardShell } from '@/components/dashboard-shell'
+import { PwaInstallButton } from '@/components/pwa-install-button'
 
 export const metadata: Metadata = {
   title: 'VetDesk — Run your vet practice. Fill your calendar.',
   description: 'VetDesk helps veterinary doctors and clinics in Nigeria manage bookings, patient records, reminders, and payments.',
   generator: 'v0.app',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: [
       {
@@ -42,6 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <div className="fixed right-4 top-4 z-50"><PwaInstallButton /></div>
         <DashboardShell>{children}</DashboardShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
