@@ -169,9 +169,26 @@
 .route-transition { min-height: 100vh; transform-style: preserve-3d; animation: route-enter-3d .48s cubic-bezier(.22, .8, .24, 1) both; }
 .route-transition a, .route-transition button { transition: transform .2s cubic-bezier(.22, .8, .24, 1), box-shadow .2s ease, background-color .2s ease, color .2s ease; }
 .route-transition a:active, .route-transition button:active { transform: translateY(1px) scale(.98); }
+@keyframes install-promo-in {
+  0% { opacity: 0; transform: translate3d(18px, 0, 0) scale(.96); }
+  65% { opacity: 1; transform: translate3d(-3px, 0, 0) scale(1.01); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes install-promo-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(37 99 235 / 0); transform: scale(1); }
+  50% { box-shadow: 0 0 0 6px rgb(37 99 235 / .12); transform: scale(1.08); }
+}
+@keyframes install-promo-arrow {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+.install-promo { animation: install-promo-in .7s cubic-bezier(.22, .8, .24, 1) both; }
+.install-promo-dot { display: block; width: .55rem; height: .55rem; flex: 0 0 auto; border-radius: 999px; background: #2563eb; animation: install-promo-pulse 2s ease-in-out infinite; }
+.install-promo-arrow { color: #2563eb; font-size: 1.35rem; font-weight: 800; animation: install-promo-arrow 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .route-transition { animation: none; }
   .route-transition a, .route-transition button { transition: none; }
+  .install-promo, .install-promo-dot, .install-promo-arrow { animation: none; }
 }
 
 @layer base {

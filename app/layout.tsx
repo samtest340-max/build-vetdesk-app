@@ -44,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <div className="flex min-h-16 items-center justify-end border-b border-blue-100 bg-blue-50/70 px-4 py-3 sm:px-6 lg:px-10"><PwaInstallButton /></div>
+        <div className="install-banner flex min-h-16 items-center justify-end gap-4 border-b border-blue-100 bg-blue-50/70 px-4 py-3 sm:px-6 lg:px-10"><div className="install-promo hidden items-center gap-3 sm:flex" aria-hidden="true"><span className="install-promo-dot" /><div><p className="text-sm font-extrabold text-blue-950">Keep VetDesk close</p><p className="text-xs text-blue-700">Install once. Open your practice dashboard faster.</p></div><span className="install-promo-arrow">→</span></div><PwaInstallButton /></div>
         <DashboardShell>{children}</DashboardShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
