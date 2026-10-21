@@ -57,9 +57,14 @@ export default function AppointmentsPage() {
     event.preventDefault()
     if (!supabase) return setNotice({ type: 'error', text: 'The appointment service is unavailable.' })
     const form = new FormData(event.currentTarget)
+    const startsAtValue = String(form.get('starts_at') || '')
+    const startsAt = new Date(startsAtValue)
+    if (!startsAtValue || Number.isNaN(startsAt.getTime())) return setNotice({ type: 'error', text: 'Choose a valid appointment date and time.' })
+    const appointmentType = String(form.get('appointment_type') || '').trim()
+    if (!appointmentType) return setNotice({ type: 'error', text: 'Choose an appointment service.' })
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return setNotice({ type: 'error', text: 'Please sign in again.' })
-    const response = await fetch('/api/appointments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ petId: String(form.get('pet_id') || '') || undefined, appointmentType: String(form.get('appointment_type')), startsAt: new Date(String(form.get('starts_at'))).toISOString(), notes: String(form.get('notes') || '') || undefined }) })
+    const response = await fetch('/api/appointments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ petId: String(form.get('pet_id') || '') || undefined, appointmentType, startsAt: startsAt.toISOString(), notes: String(form.get('notes') || '') || undefined }) })
     if (!response.ok) { const body = await response.json().catch(() => null); setNotice({ type: 'error', text: body?.error || 'Unable to save appointment.' }) }
     else { setShowForm(false); setNotice({ type: 'success', text: 'Appointment saved successfully.' }); await loadAppointments() }
   }
