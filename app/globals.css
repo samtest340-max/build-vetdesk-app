@@ -198,4 +198,8 @@
   body {
     @apply bg-background text-foreground;
   }
+  body.dashboard-menu-open { overflow: hidden; }
+}
+@media (min-width: 1024px) {
+  body:has(.route-transition.flex.h-\[100dvh\]) { overflow: hidden; }
 }
