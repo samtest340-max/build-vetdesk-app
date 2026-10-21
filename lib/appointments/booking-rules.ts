@@ -20,6 +20,13 @@ export function lagosDateTimeToIso(dateKey: string, minutes: number) {
   return new Date(Date.UTC(year, month - 1, day, Math.floor(minutes / 60) - 1, minutes % 60)).toISOString()
 }
 
+export function lagosLocalInputToIso(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return null
+  const [, year, month, day, hour, minute] = match.map(Number)
+  return new Date(Date.UTC(year, month - 1, day, hour - 1, minute)).toISOString()
+}
+
 export function minutesInLagos(value: string) {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: APPOINTMENT_TIMEZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value))
   return Number(parts.find(part => part.type === 'hour')?.value) * 60 + Number(parts.find(part => part.type === 'minute')?.value)

@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AppointmentCalendar } from '@/components/appointment-calendar'
-import { lagosDateKey } from '@/lib/appointments/booking-rules'
+import { lagosDateKey, lagosLocalInputToIso } from '@/lib/appointments/booking-rules'
 
 type Appointment = { id: string; appointment_type: string; starts_at: string; status: 'pending' | 'approved' | 'cancelled'; notes: string | null; fee: number; pet: { name: string } | null }
 type Patient = { id: string; name: string; species: string }
@@ -62,13 +62,14 @@ export default function AppointmentsPage() {
     if (!supabase) return notify({ type: 'error', text: 'The appointment service is unavailable.' })
     const form = new FormData(event.currentTarget)
     const startsAtValue = String(form.get('starts_at') || '')
-    const startsAt = new Date(startsAtValue)
-    if (!startsAtValue || Number.isNaN(startsAt.getTime())) return notify({ type: 'error', text: 'Choose a valid appointment date and time.' })
+    const startsAtIso = lagosLocalInputToIso(startsAtValue)
+    if (!startsAtValue || !startsAtIso) return notify({ type: 'error', text: 'Choose a valid appointment date and time.' })
+    const startsAt = new Date(startsAtIso)
     const appointmentType = String(form.get('appointment_type') || '').trim()
     if (!appointmentType) return notify({ type: 'error', text: 'Choose an appointment service.' })
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return notify({ type: 'error', text: 'Please sign in again.' })
-    const response = await fetch('/api/appointments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ petId: String(form.get('pet_id') || '') || undefined, appointmentType, startsAt: startsAt.toISOString(), notes: String(form.get('notes') || '') || undefined }) })
+    const response = await fetch('/api/appointments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ petId: String(form.get('pet_id') || '') || undefined, appointmentType, startsAt: startsAtIso, notes: String(form.get('notes') || '') || undefined }) })
     if (!response.ok) { const body = await response.json().catch(() => null); notify({ type: 'error', text: body?.error || 'Unable to save appointment.' }) }
     else { setShowForm(false); notify({ type: 'success', text: 'Appointment saved successfully.' }); await loadAppointments() }
   }
