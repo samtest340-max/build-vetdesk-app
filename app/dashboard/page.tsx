@@ -30,12 +30,15 @@ export default function DashboardPage() {
     setDisplayName(profile?.full_name?.trim() || user.email?.split('@')[0] || 'there')
     setCalendarConnected(Boolean(profile?.google_calendar_connected))
     setPublicLink(`${window.location.origin}/book/${user.id}`)
-    const [appointmentsResult, patientsResult] = await Promise.all([
-      supabase.from('appointments').select('id,appointment_type,starts_at,status,fee,pet:pets(name)').gte('starts_at', new Date().toISOString()).order('starts_at').limit(5),
+    const [appointmentsResult, patientsResult, servicesResult] = await Promise.all([
+      supabase.from('appointments').select('id,appointment_type,starts_at,status,fee,pet:pets(name)').order('starts_at'),
       supabase.from('pets').select('id', { count: 'exact', head: true }),
+      supabase.from('services').select('name,fee'),
     ])
-    if (appointmentsResult.error || patientsResult.error) setNotice({ type: 'error', text: 'Unable to load dashboard data.' })
-    setAppointments((appointmentsResult.data ?? []) as unknown as Appointment[])
+    if (appointmentsResult.error || patientsResult.error || servicesResult.error) setNotice({ type: 'error', text: 'Unable to load dashboard data.' })
+    const servicePrices = new Map<string, number>((servicesResult.data ?? []).map((service: { name: string; fee: number | null }) => [service.name, Number(service.fee) || 0]))
+    const normalizedAppointments: Appointment[] = ((appointmentsResult.data ?? []) as unknown as Appointment[]).map(item => ({ ...item, fee: Number(item.fee) || servicePrices.get(item.appointment_type) || 0 }))
+    setAppointments(normalizedAppointments.filter(item => item.status !== 'cancelled'))
     setPatientCount(patientsResult.count ?? 0)
     setLoading(false)
   }
