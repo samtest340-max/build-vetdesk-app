@@ -1,43 +1,42 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { eq, and, ne, gte, lt } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { appointments, pets, user, vetProfiles } from '@/lib/db/schema'
 import { lagosDateKey, validateBooking } from '@/lib/appointments/booking-rules'
+
+const defaultServices = [
+  { id: 'consultation', name: 'Consultation', fee: 2000 },
+  { id: 'vaccination', name: 'Vaccination', fee: 2000 },
+  { id: 'follow-up', name: 'Follow-up visit', fee: 1500 },
+]
 
 export async function GET(_request: Request, context: { params: Promise<{ userId: string }> }) {
   const { userId } = await context.params
-  const admin = createAdminClient()
-  const [{ data: profile, error: profileError }, { data: appointments, error: appointmentsError }, { data: services, error: servicesError }] = await Promise.all([
-    admin.from('profiles').select('id,full_name,clinic_name,specialization').eq('id', userId).maybeSingle(),
-    admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date().toISOString()).order('starts_at'),
-    admin.from('services').select('id,name,fee').eq('user_id', userId).order('name'),
+  const [owner, profile] = await Promise.all([
+    db.select({ id: user.id, name: user.name }).from(user).where(eq(user.id, userId)).limit(1),
+    db.select({ fullName: vetProfiles.fullName, clinicName: vetProfiles.clinicName, specialization: vetProfiles.specialization, profilePhotoUrl: vetProfiles.profilePhotoUrl }).from(vetProfiles).where(eq(vetProfiles.userId, userId)).limit(1),
   ])
-  if (profileError || !profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
-  if (appointmentsError || servicesError) return NextResponse.json({ error: 'Unable to load booking details.' }, { status: 500 })
-  return NextResponse.json({ profile, blockedSlots: appointments ?? [], services: services ?? [] })
+  if (!owner[0]) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
+  const upcoming = await db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(eq(appointments.userId, userId), ne(appointments.status, 'cancelled'), gte(appointments.startsAt, new Date())))
+  return NextResponse.json({ profile: { full_name: profile[0]?.fullName || owner[0].name, clinic_name: profile[0]?.clinicName || null, specialization: profile[0]?.specialization || null, profile_photo_url: profile[0]?.profilePhotoUrl || null }, blockedSlots: upcoming.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })), services: defaultServices })
 }
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
   const { userId } = await context.params
   const body = await request.json().catch(() => null) as { appointmentType?: string; startsAt?: string; name?: string; email?: string; phone?: string; notes?: string } | null
   if (!body?.appointmentType || !body.startsAt || !body.name || !body.email) return NextResponse.json({ error: 'Name, email, appointment type and date are required.' }, { status: 400 })
+  const owner = await db.select({ id: user.id }).from(user).where(eq(user.id, userId)).limit(1)
+  if (!owner[0]) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
   const startsAt = new Date(body.startsAt)
   if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) return NextResponse.json({ error: 'Choose a future date and time.' }, { status: 400 })
-  const admin = createAdminClient()
-  const { data: profile } = await admin.from('profiles').select('id').eq('id', userId).maybeSingle()
-  if (!profile) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
-  const { data: configuredServices, error: servicesError } = await admin.from('services').select('name').eq('user_id', userId)
-  if (servicesError) return NextResponse.json({ error: 'Unable to load service pricing.' }, { status: 500 })
-  if (!configuredServices?.length) return NextResponse.json({ error: 'This practice is not accepting bookings yet. The owner must add services and prices first.' }, { status: 409 })
-  if (!configuredServices.some(service => service.name === body.appointmentType)) return NextResponse.json({ error: 'Choose one of the practice services.' }, { status: 400 })
   const dateKey = lagosDateKey(startsAt)
-  const { data: existing, error: existingError } = await admin.from('appointments').select('id,starts_at,status').eq('user_id', userId).neq('status', 'cancelled').gte('starts_at', new Date(`${dateKey}T00:00:00+01:00`).toISOString()).lt('starts_at', new Date(`${dateKey}T23:59:59+01:00`).toISOString())
-  if (existingError) return NextResponse.json({ error: 'Unable to verify availability.' }, { status: 500 })
-  if (!validateBooking(dateKey, startsAt.toISOString(), existing ?? [])) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
-  const notes = [`External booking: ${body.name}`, `Email: ${body.email}`, body.phone ? `Phone: ${body.phone}` : '', body.notes ? `Notes: ${body.notes}` : ''].filter(Boolean).join('\n')
-  const { error } = await admin.from('appointments').insert({ user_id: userId, pet_id: null, appointment_type: body.appointmentType, starts_at: startsAt.toISOString(), status: 'pending', notes })
-  if (error) return NextResponse.json({ error: 'Unable to submit booking.' }, { status: 500 })
+  const existing = await db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(eq(appointments.userId, userId), ne(appointments.status, 'cancelled'), gte(appointments.startsAt, new Date(`${dateKey}T00:00:00+01:00`)), lt(appointments.startsAt, new Date(`${dateKey}T23:59:59+01:00`))))
+  if (!validateBooking(dateKey, startsAt.toISOString(), existing.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })))) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
+  const petId = crypto.randomUUID()
+  await db.insert(pets).values({ id: petId, userId, name: `${body.name}'s booking`, species: 'Pending profile', breed: null, ownerName: body.name, weight: null })
+  await db.insert(appointments).values({ id: crypto.randomUUID(), userId, petId, appointmentType: body.appointmentType, startsAt, status: 'pending', notes: [`Client: ${body.name}`, `Email: ${body.email}`, body.phone ? `Phone: ${body.phone}` : '', body.notes ? `Notes: ${body.notes}` : ''].filter(Boolean).join('\n') })
   return NextResponse.json({ ok: true })
 }
 
 export async function OPTIONS() { return new NextResponse(null, { status: 204 }) }
-
 export const dynamic = 'force-dynamic'
