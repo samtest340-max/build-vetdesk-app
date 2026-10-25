@@ -2,10 +2,10 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, PawPrint, Share2, X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth-client'
 import { AppointmentCalendar } from '@/components/appointment-calendar'
 
 type Notice = { type: 'success' | 'error'; text: string }
@@ -19,33 +19,17 @@ export default function DashboardPage() {
   const [displayName, setDisplayName] = useState('there')
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
-  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
-
   async function loadDashboard() {
-    if (!supabase) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: session } = await authClient.getSession()
+    const user = session?.user
     if (!user) { window.location.replace('/sign-in'); return }
-    const { data: profile } = await supabase.from('profiles').select('full_name,google_calendar_connected').eq('id', user.id).maybeSingle()
-    setDisplayName(profile?.full_name?.trim() || user.email?.split('@')[0] || 'there')
-    setCalendarConnected(Boolean(profile?.google_calendar_connected))
+    setDisplayName(user.name?.trim() || user.email?.split('@')[0] || 'there')
     setPublicLink(`${window.location.origin}/book/${user.id}`)
-    const [appointmentsResult, patientsResult] = await Promise.all([
-      supabase.from('appointments').select('id,appointment_type,starts_at,status,fee,pet:pets(name)').gte('starts_at', new Date().toISOString()).order('starts_at').limit(5),
-      supabase.from('pets').select('id', { count: 'exact', head: true }),
-    ])
-    if (appointmentsResult.error || patientsResult.error) setNotice({ type: 'error', text: 'Unable to load dashboard data.' })
-    setAppointments((appointmentsResult.data ?? []) as unknown as Appointment[])
-    setPatientCount(patientsResult.count ?? 0)
     setLoading(false)
   }
 
-  useEffect(() => {
-    if (!supabase) return
-    void loadDashboard()
-    const channel = supabase.channel('dashboard-live').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => void loadDashboard()).on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, () => void loadDashboard()).subscribe()
-    return () => { void supabase.removeChannel(channel) }
-  }, [supabase])
+  useEffect(() => { void loadDashboard() }, [])
 
   return <main className="min-h-screen bg-slate-50 text-slate-950">
     <section><header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-5 lg:px-10"><div><div><p className="eyebrow">Practice overview</p><h1 className="text-2xl font-extrabold">Good day, {displayName}</h1></div></div></header>
