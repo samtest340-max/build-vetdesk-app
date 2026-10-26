@@ -16,7 +16,7 @@ export default function SignUpPage() {
     try {
       const result = await authClient.signUp.email({ name: String(data.get('name')), email: String(data.get('email')), password: String(data.get('password')) })
       if (result.error) setError('We could not create your account. Check your details and try again.')
-      else { await router.push('/onboarding'); router.refresh() }
+      else { void fetch('/api/email/welcome', { method: 'POST' }); await router.push('/onboarding'); router.refresh() }
     } catch { setError('Unable to reach the sign-up service. Please try again.') }
     finally { setLoading(false) }
   }

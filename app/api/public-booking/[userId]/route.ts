@@ -3,6 +3,7 @@ import { eq, and, ne, gte, lt } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { appointments, pets, user, vetProfiles } from '@/lib/db/schema'
 import { lagosDateKey, validateBooking } from '@/lib/appointments/booking-rules'
+import { sendTransactionalEmail } from '@/lib/email'
 
 const defaultServices = [
   { id: 'consultation', name: 'Consultation', fee: 2000 },
@@ -11,9 +12,12 @@ const defaultServices = [
 ]
 
 export async function GET(_request: Request, context: { params: Promise<{ userId: string }> }) {
-  const { userId } = await context.params
+  const { userId: rawUserId } = await context.params
+  const ownerById = await db.select({ id: user.id, name: user.name, email: user.email, publicSlug: user.publicSlug }).from(user).where(eq(user.id, rawUserId)).limit(1)
+  const ownerBySlug = ownerById[0] ? ownerById : await db.select({ id: user.id, name: user.name, email: user.email, publicSlug: user.publicSlug }).from(user).where(eq(user.publicSlug, rawUserId)).limit(1)
+  const userId = ownerBySlug[0]?.id || rawUserId
   const [owner, profile] = await Promise.all([
-    db.select({ id: user.id, name: user.name }).from(user).where(eq(user.id, userId)).limit(1),
+    ownerBySlug,
     db.select({ fullName: vetProfiles.fullName, clinicName: vetProfiles.clinicName, specialization: vetProfiles.specialization, profilePhotoUrl: vetProfiles.profilePhotoUrl }).from(vetProfiles).where(eq(vetProfiles.userId, userId)).limit(1),
   ])
   if (!owner[0]) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
@@ -22,11 +26,13 @@ export async function GET(_request: Request, context: { params: Promise<{ userId
 }
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
-  const { userId } = await context.params
+  const { userId: rawUserId } = await context.params
   const body = await request.json().catch(() => null) as { appointmentType?: string; startsAt?: string; name?: string; email?: string; phone?: string; notes?: string } | null
   if (!body?.appointmentType || !body.startsAt || !body.name || !body.email) return NextResponse.json({ error: 'Name, email, appointment type and date are required.' }, { status: 400 })
-  const owner = await db.select({ id: user.id }).from(user).where(eq(user.id, userId)).limit(1)
-  if (!owner[0]) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
+  const owner = await db.select({ id: user.id, email: user.email, name: user.name }).from(user).where(eq(user.id, rawUserId)).limit(1)
+  const ownerBySlug = owner[0] ? owner : await db.select({ id: user.id, email: user.email, name: user.name }).from(user).where(eq(user.publicSlug, rawUserId)).limit(1)
+  const userId = ownerBySlug[0]?.id
+  if (!userId || !ownerBySlug[0]) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
   const startsAt = new Date(body.startsAt)
   if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) return NextResponse.json({ error: 'Choose a future date and time.' }, { status: 400 })
   const dateKey = lagosDateKey(startsAt)
@@ -34,7 +40,10 @@ export async function POST(request: Request, context: { params: Promise<{ userId
   if (!validateBooking(dateKey, startsAt.toISOString(), existing.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })))) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
   const petId = crypto.randomUUID()
   await db.insert(pets).values({ id: petId, userId, name: `${body.name}'s booking`, species: 'Pending profile', breed: null, ownerName: body.name, weight: null })
-  await db.insert(appointments).values({ id: crypto.randomUUID(), userId, petId, appointmentType: body.appointmentType, startsAt, status: 'pending', notes: [`Client: ${body.name}`, `Email: ${body.email}`, body.phone ? `Phone: ${body.phone}` : '', body.notes ? `Notes: ${body.notes}` : ''].filter(Boolean).join('\n') })
+  const appointmentId = crypto.randomUUID()
+  await db.insert(appointments).values({ id: appointmentId, userId, petId, appointmentType: body.appointmentType, startsAt, status: 'pending', notes: [`Client: ${body.name}`, `Email: ${body.email}`, body.phone ? `Phone: ${body.phone}` : '', body.notes ? `Notes: ${body.notes}` : ''].filter(Boolean).join('\n') })
+  void sendTransactionalEmail({ to: ownerBySlug[0].email, userId, eventKey: `appointment-created/${appointmentId}`, subject: 'New appointment request', title: 'New appointment request', text: `${body.name} requested a ${body.appointmentType} appointment.`, body: `<p><strong>${body.name}</strong> requested a <strong>${body.appointmentType}</strong> appointment for ${startsAt.toLocaleString()}.</p>`, action: { label: 'View appointments', href: `${process.env.BETTER_AUTH_URL || process.env.V0_RUNTIME_URL || ''}/appointments` } })
+  void sendTransactionalEmail({ to: body.email, userId, eventKey: `appointment-confirmation/${appointmentId}`, subject: 'Appointment request received', title: 'Booking request received', text: `Your appointment request with ${ownerBySlug[0].name} was received.`, body: `<p>Your request with <strong>${ownerBySlug[0].name}</strong> was received and is pending confirmation.</p>` })
   return NextResponse.json({ ok: true })
 }
 

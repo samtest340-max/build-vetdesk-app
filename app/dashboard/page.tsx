@@ -25,7 +25,9 @@ export default function DashboardPage() {
     const user = session?.user
     if (!user) { window.location.replace('/sign-in'); return }
     setDisplayName(user.name?.trim() || user.email?.split('@')[0] || 'there')
-    setPublicLink(`${window.location.origin}/book/${user.id}`)
+    const linkResponse = await fetch('/api/profile/public-link')
+    const linkData = await linkResponse.json()
+    setPublicLink(`${window.location.origin}${linkData.url || `/book/${user.id}`}`)
     setLoading(false)
   }
 
