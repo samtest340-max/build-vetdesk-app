@@ -27,7 +27,7 @@ export async function GET(_request: Request, context: { params: Promise<{ userId
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
   const { userId: rawUserId } = await context.params
-  const body = await request.json().catch(() => null) as { appointmentType?: string; startsAt?: string; name?: string; email?: string; phone?: string; notes?: string } | null
+  const body = await request.json().catch(() => null) as { appointmentType?: string; startsAt?: string; name?: string; email?: string; phone?: string; petName?: string; species?: string; breed?: string; weight?: string; notes?: string } | null
   if (!body?.appointmentType || !body.startsAt || !body.name || !body.email) return NextResponse.json({ error: 'Name, email, appointment type and date are required.' }, { status: 400 })
   const owner = await db.select({ id: user.id, email: user.email, name: user.name }).from(user).where(eq(user.id, rawUserId)).limit(1)
   const ownerBySlug = owner[0] ? owner : await db.select({ id: user.id, email: user.email, name: user.name }).from(user).where(eq(user.publicSlug, rawUserId)).limit(1)
