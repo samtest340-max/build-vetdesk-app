@@ -1,6 +1,6 @@
 const CACHE_NAME = 'vetdesk-shell-v2'
 const QUEUE_NAME = 'vetdesk-offline-requests'
-const APP_SHELL = ['/manifest.webmanifest', '/icon-light-32x32.png', '/apple-icon.png']
+const APP_SHELL = ['/dashboard', '/appointments', '/patients', '/care', '/schedule', '/settings', '/manifest.webmanifest', '/icon-light-32x32.png', '/apple-icon.png']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()))
@@ -23,6 +23,6 @@ self.addEventListener('message', event => { if (event.data?.type === 'SYNC_NOW')
 self.addEventListener('online', () => { void flushQueue() })
 self.addEventListener('fetch', event => {
   const request = event.request
-  if (request.method === 'GET' && request.url.startsWith(self.location.origin)) event.respondWith(fetch(request).then(response => { const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(request, copy)); return response }).catch(() => caches.match(request).then(cached => cached || new Response('Offline', { status: 503 }))))
+  if (request.method === 'GET' && request.url.startsWith(self.location.origin)) event.respondWith(fetch(request).then(response => { const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(request, copy)); return response }).catch(() => caches.match(request).then(cached => cached || caches.match('/dashboard').then(fallback => fallback || new Response('Offline', { status: 503 })))))
   else if (request.method !== 'GET' && request.url.startsWith(self.location.origin)) event.respondWith(fetch(request).catch(() => queueRequest(request)))
 })
