@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth-client'
 import { AppointmentCalendar } from '@/components/appointment-calendar'
 import { lagosDateKey, lagosLocalInputToIso } from '@/lib/appointments/booking-rules'
 
@@ -67,7 +68,8 @@ export default function AppointmentsPage() {
     const startsAt = new Date(startsAtIso)
     const appointmentType = String(form.get('appointment_type') || '').trim()
     if (!appointmentType) return notify({ type: 'error', text: 'Choose an appointment service.' })
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: session } = await authClient.getSession()
+    const user = session?.user
     if (!user) return notify({ type: 'error', text: 'Please sign in again.' })
     const response = await fetch('/api/appointments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ petId: String(form.get('pet_id') || '') || undefined, appointmentType, startsAt: startsAtIso, notes: String(form.get('notes') || '') || undefined }) })
     if (!response.ok) { const body = await response.json().catch(() => null); notify({ type: 'error', text: body?.error || 'Unable to save appointment.' }) }

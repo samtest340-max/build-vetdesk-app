@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
 import { APPOINTMENT_DURATION_MINUTES, WORKDAY_END_MINUTES, WORKDAY_START_MINUTES, lagosDateKey, minutesInLagos } from '@/lib/appointments/booking-rules'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await auth.api.getSession({ headers: await headers() })
+  const user = session?.user
   if (!user) return NextResponse.json({ error: 'Please sign in again.' }, { status: 401 })
   const body = await request.json().catch(() => null) as { petId?: string; appointmentType?: string; startsAt?: string; notes?: string } | null
   if (!body?.appointmentType || !body.startsAt) return NextResponse.json({ error: 'Appointment type and time are required.' }, { status: 400 })
