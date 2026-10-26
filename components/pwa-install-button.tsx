@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Download, Check } from 'lucide-react'
+import { Download } from 'lucide-react'
 
 export function PwaInstallButton() {
   const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -21,7 +21,7 @@ export function PwaInstallButton() {
     return () => { window.removeEventListener('beforeinstallprompt', onInstallPrompt); window.removeEventListener('appinstalled', onInstalled) }
   }, [])
 
-  if (installed) return <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"><Check data-icon="inline-start" />Installed</span>
+  if (installed) return null
 
   async function install() {
     if (!prompt) { window.alert('Use your browser menu to install VetDesk when the install option is available.'); return }
