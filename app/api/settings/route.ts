@@ -21,9 +21,9 @@ export async function PUT(request: Request) {
   const current = await currentUser()
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => null)
-  if (!body?.name || !body?.address || !body?.state || !body?.lga) return NextResponse.json({ error: 'Complete all practice details.' }, { status: 400 })
+  if (!body?.name?.trim() || !body?.address?.trim() || !body?.state?.trim() || !body?.lga?.trim()) return NextResponse.json({ error: 'Complete all practice details.' }, { status: 400 })
   const existing = await db.select({ id: clinics.id }).from(clinics).where(eq(clinics.ownerId, current.id)).limit(1)
-  const values = { name: String(body.name), address: String(body.address), state: String(body.state), lga: String(body.lga) }
+  const values = { name: String(body.name).trim(), address: String(body.address).trim(), state: String(body.state).trim(), lga: String(body.lga).trim() }
   const clinic = existing[0] ? await db.update(clinics).set(values).where(eq(clinics.id, existing[0].id)).returning() : await db.insert(clinics).values({ id: crypto.randomUUID(), ownerId: current.id, ...values }).returning()
   return NextResponse.json({ clinic: clinic[0] })
 }

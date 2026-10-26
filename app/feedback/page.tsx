@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, MessageSquarePlus, Trash2 } from 'lucide-react'
 
-type Feedback = { id: string; subject: string; details: string; status: string; created_at: string }
+type Feedback = { id: string; subject: string; details: string; status: string; createdAt: string }
 
 export default function FeedbackPage() {
   const [items, setItems] = useState<Feedback[]>([])
