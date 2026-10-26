@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Bell, Building2, CalendarDays, Save, Unplug } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth-client'
 
 type Notice = { type: 'success' | 'error'; text: string }
 type Profile = { clinic_name: string; address: string; state: string; lga: string; reminder_preferences: Record<string, boolean> }
@@ -15,32 +15,25 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
 
   useEffect(() => {
-    if (!supabase) return
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.replace('/sign-in'); return }
-      const [{ data, error }, { data: connection }] = await Promise.all([
-        supabase.from('profiles').select('clinic_name,address,state,lga,reminder_preferences').eq('id', user.id).maybeSingle(),
-        supabase.from('google_calendar_connections').select('google_user_email').eq('user_id', user.id).maybeSingle(),
-      ])
-      if (error) setNotice({ type: 'error', text: 'Unable to load settings.' })
-      if (data) setProfile({ clinic_name: data.clinic_name ?? '', address: data.address ?? '', state: data.state ?? '', lga: data.lga ?? '', reminder_preferences: (data.reminder_preferences ?? {}) as Record<string, boolean> })
-      setCalendarEmail(connection?.google_user_email ?? null)
+      const { data: session } = await authClient.getSession()
+      if (!session?.user) { window.location.replace('/sign-in'); return }
+      const response = await fetch('/api/settings', { cache: 'no-store' })
+      if (!response.ok) { setNotice({ type: 'error', text: 'Unable to load settings.' }); setLoading(false); return }
+      const result = await response.json()
+      const data = result.clinic
+      if (data) setProfile({ clinic_name: data.name ?? '', address: data.address ?? '', state: data.state ?? '', lga: data.lga ?? '', reminder_preferences: {} })
       setLoading(false)
     }
     void load()
-  }, [supabase])
+  }, [])
 
   async function save() {
-    if (!supabase) { setNotice({ type: 'error', text: 'The settings service is unavailable.' }); return }
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setNotice({ type: 'error', text: 'Your session has expired.' }); setSaving(false); return }
-    const { error } = await supabase.from('profiles').update(profile).eq('id', user.id)
-    setNotice(error ? { type: 'error', text: 'Unable to save settings.' } : { type: 'success', text: 'Settings saved.' })
+    const response = await fetch('/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: profile.clinic_name, address: profile.address, state: profile.state, lga: profile.lga }) })
+    setNotice(response.ok ? { type: 'success', text: 'Settings saved.' } : { type: 'error', text: 'Unable to save settings.' })
     setSaving(false)
   }
 
