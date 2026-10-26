@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { clinics, user } from '@/lib/db/schema'
+import { clinics, googleCalendarConnections } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
 async function currentUser() {
@@ -13,8 +13,8 @@ async function currentUser() {
 export async function GET() {
   const current = await currentUser()
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const clinic = await db.select().from(clinics).where(eq(clinics.ownerId, current.id)).limit(1)
-  return NextResponse.json({ clinic: clinic[0] ?? null, remindersEnabled: true })
+  const [clinic, calendar] = await Promise.all([db.select().from(clinics).where(eq(clinics.ownerId, current.id)).limit(1), db.select({ email: googleCalendarConnections.googleUserEmail }).from(googleCalendarConnections).where(eq(googleCalendarConnections.userId, current.id)).limit(1)])
+  return NextResponse.json({ clinic: clinic[0] ?? null, calendarEmail: calendar[0]?.email ?? null, remindersEnabled: true })
 }
 
 export async function PUT(request: Request) {

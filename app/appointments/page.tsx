@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { authClient } from '@/lib/auth-client'
 import { AppointmentCalendar } from '@/components/appointment-calendar'
 import { lagosDateKey, lagosLocalInputToIso } from '@/lib/appointments/booking-rules'
@@ -14,7 +13,6 @@ type Notice = { type: 'success' | 'error'; text: string }
 type Service = { id: string; name: string; fee: number }
 
 export default function AppointmentsPage() {
-  const supabase = useMemo(() => (typeof window === 'undefined' ? null : createClient()), [])
   const [date, setDate] = useState(() => new Date())
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>([])
@@ -29,38 +27,22 @@ export default function AppointmentsPage() {
   function notify(next: Notice) { setNotice(next); window.setTimeout(() => setNotice(current => current?.text === next.text ? null : current), 5000) }
 
   async function loadAppointments() {
-    if (!supabase) return
     setLoading(true)
-    const start = new Date(`${dateKey}T00:00:00`).toISOString()
-    const end = new Date(`${dateKey}T23:59:59`).toISOString()
-    const { data, error } = await supabase.from('appointments').select('id,appointment_type,starts_at,status,notes,fee,pet:pets(name)').gte('starts_at', start).lte('starts_at', end).order('starts_at')
-    if (error) notify({ type: 'error', text: 'Unable to load appointments.' })
-    else setAppointments((data ?? []) as unknown as Appointment[])
-    const calendarStart = new Date(); const calendarEnd = new Date(); calendarEnd.setDate(calendarEnd.getDate() + 90)
-    const { data: serviceData } = await supabase.from('services').select('id,name,fee').order('name')
-    setServices((serviceData ?? []) as Service[])
-    const { data: calendarData } = await supabase.from('appointments').select('id,appointment_type,starts_at,status,notes,fee,pet:pets(name)').gte('starts_at', calendarStart.toISOString()).lte('starts_at', calendarEnd.toISOString()).order('starts_at')
-    setCalendarAppointments((calendarData ?? []) as unknown as Appointment[])
-    const { data: pendingData } = await supabase.from('appointments').select('id,appointment_type,starts_at,status,notes,fee,pet:pets(name)').eq('status', 'pending').order('starts_at')
-    setPendingAppointments((pendingData ?? []) as unknown as Appointment[])
+    const response = await fetch('/api/appointments', { cache: 'no-store' })
+    if (!response.ok) notify({ type: 'error', text: 'Unable to load appointments.' })
+    else { const data = await response.json() as Appointment[]; setAppointments(data.filter(item => lagosDateKey(new Date(item.starts_at)) === dateKey)); setCalendarAppointments(data); setPendingAppointments(data.filter(item => item.status === 'pending')) }
+    const scheduleResponse = await fetch('/api/schedule', { cache: 'no-store' }); if (scheduleResponse.ok) setServices((await scheduleResponse.json()).services ?? [])
     setLoading(false)
   }
 
   useEffect(() => {
-    if (!supabase) return
     void loadAppointments()
-    const channel = supabase.channel('appointments-live').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => void loadAppointments()).subscribe()
-    return () => { void supabase.removeChannel(channel) }
-  }, [dateKey, supabase])
+  }, [dateKey])
 
-  useEffect(() => {
-    if (!supabase) return
-    void supabase.from('pets').select('id,name,species').order('name').then(({ data }: { data: Patient[] | null }) => setPatients(data ?? []))
-  }, [supabase])
+  useEffect(() => { void fetch('/api/patients', { cache: 'no-store' }).then(response => response.ok ? response.json() : []).then(data => setPatients(data)) }, [])
 
   async function createAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!supabase) return notify({ type: 'error', text: 'The appointment service is unavailable.' })
     const form = new FormData(event.currentTarget)
     const startsAtValue = String(form.get('starts_at') || '')
     const startsAtIso = lagosLocalInputToIso(startsAtValue)
@@ -77,8 +59,8 @@ export default function AppointmentsPage() {
   }
 
   async function updateStatus(id: string, status: 'pending' | 'approved' | 'cancelled') {
-    if (!supabase) return notify({ type: 'error', text: 'The appointment service is unavailable.' })
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
+    const response = await fetch('/api/appointments', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, status }) })
+    const error = !response.ok
     if (!error && status === 'approved') { const sync = await fetch('/api/google/calendar/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ appointmentId: id }) }); if (!sync.ok) notify({ type: 'error', text: 'Approved, but Google Calendar could not be updated.' }) }
     if (error) notify({ type: 'error', text: 'Unable to update appointment status.' })
     else { setAppointments(items => items.map(item => item.id === id ? { ...item, status } : item)); notify({ type: 'success', text: `Appointment ${status}.` }) }

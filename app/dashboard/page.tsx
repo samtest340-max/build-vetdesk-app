@@ -25,9 +25,12 @@ export default function DashboardPage() {
     const user = session?.user
     if (!user) { window.location.replace('/sign-in'); return }
     setDisplayName(user.name?.trim() || user.email?.split('@')[0] || 'there')
-    const linkResponse = await fetch('/api/profile/public-link')
+    const [linkResponse, appointmentResponse, patientResponse, settingsResponse] = await Promise.all([fetch('/api/profile/public-link'), fetch('/api/appointments', { cache: 'no-store' }), fetch('/api/patients', { cache: 'no-store' }), fetch('/api/settings', { cache: 'no-store' })])
     const linkData = await linkResponse.json()
     setPublicLink(`${window.location.origin}${linkData.url || `/book/${user.id}`}`)
+    if (appointmentResponse.ok) setAppointments(await appointmentResponse.json())
+    if (patientResponse.ok) setPatientCount((await patientResponse.json()).length)
+    if (settingsResponse.ok) setCalendarConnected(Boolean((await settingsResponse.json()).calendarEmail))
     setLoading(false)
   }
 
