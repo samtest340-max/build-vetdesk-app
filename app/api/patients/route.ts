@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => null)
   if (!body?.name || !body?.species || !body?.ownerName) return NextResponse.json({ error: 'Name, species, and owner name are required.' }, { status: 400 })
-  const row = { id: crypto.randomUUID(), userId: current.id, name: String(body.name), species: String(body.species), breed: body.breed ? String(body.breed) : null, ownerName: String(body.ownerName), weight: body.weight ? String(body.weight) : null }
+  const row = { id: crypto.randomUUID(), userId: current.id, name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null }
   await db.insert(pets).values(row)
   return NextResponse.json(row, { status: 201 })
 }
@@ -32,6 +32,6 @@ export async function PATCH(request: Request) {
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => null)
   if (!body?.id) return NextResponse.json({ error: 'Patient id is required.' }, { status: 400 })
-  const result = await db.update(pets).set({ name: String(body.name), species: String(body.species), breed: body.breed ? String(body.breed) : null, ownerName: String(body.ownerName), weight: body.weight ? String(body.weight) : null }).where(and(eq(pets.id, String(body.id)), eq(pets.userId, current.id))).returning()
+  const result = await db.update(pets).set({ name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null, notes: body.notes ? String(body.notes) : undefined, diagnosis: body.diagnosis ? String(body.diagnosis) : undefined, treatmentPlan: body.treatmentPlan ? String(body.treatmentPlan) : undefined, visitNotes: body.visitNotes ? String(body.visitNotes) : undefined }).where(and(eq(pets.id, String(body.id)), eq(pets.userId, current.id))).returning()
   return result[0] ? NextResponse.json(result[0]) : NextResponse.json({ error: 'Patient not found.' }, { status: 404 })
 }
