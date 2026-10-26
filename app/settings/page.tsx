@@ -25,6 +25,7 @@ export default function SettingsPage() {
       const result = await response.json()
       const data = result.clinic
       if (data) setProfile({ clinic_name: data.name ?? '', address: data.address ?? '', state: data.state ?? '', lga: data.lga ?? '', reminder_preferences: {} })
+      setCalendarEmail(result.calendarEmail ?? null)
       setLoading(false)
     }
     void load()

@@ -1,49 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data, error } = await supabase.from('feedback_requests').select('id,subject,details,status,created_at').eq('user_id', user.id).order('created_at', { ascending: false })
-  if (error) return NextResponse.json({ error: 'Unable to load feedback' }, { status: 500 })
-  return NextResponse.json(data)
-}
-
-export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await request.json() as { subject?: string; details?: string }
-  if (!body.subject?.trim() || !body.details?.trim()) return NextResponse.json({ error: 'Subject and details are required' }, { status: 400 })
-  const { data, error } = await supabase.from('feedback_requests').insert({ user_id: user.id, subject: body.subject.trim(), details: body.details.trim() }).select('id,subject,details,status,created_at').single()
-  if (error) return NextResponse.json({ error: 'Unable to save feedback' }, { status: 500 })
-  return NextResponse.json(data, { status: 201 })
-}
-
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const body = await request.json() as { id?: string; status?: string }
-  if (!body.id || !['new', 'reviewing', 'completed'].includes(body.status ?? '')) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
-  const { error } = await createAdminClient().from('feedback_requests').update({ status: body.status }).eq('id', body.id)
-  if (error) return NextResponse.json({ error: 'Unable to update feedback' }, { status: 500 })
-  return NextResponse.json({ ok: true })
-}
-
-export async function DELETE(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await request.json().catch(() => ({})) as { id?: string }
-  if (!body.id) return NextResponse.json({ error: 'Request id is required' }, { status: 400 })
-  const { error } = await supabase.from('feedback_requests').delete().eq('id', body.id).eq('user_id', user.id)
-  if (error) return NextResponse.json({ error: 'Unable to delete request' }, { status: 500 })
-  return NextResponse.json({ ok: true })
-} 
-
-export const dynamic = 'force-dynamic'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { feedbackRequests } from '@/lib/db/schema'
+import { and, desc, eq } from 'drizzle-orm'
+async function currentUser() { const session = await auth.api.getSession({ headers: await headers() }); return session?.user ?? null }
+export async function GET() { const current = await currentUser(); if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); return NextResponse.json(await db.select().from(feedbackRequests).where(eq(feedbackRequests.userId, current.id)).orderBy(desc(feedbackRequests.createdAt))) }
+export async function POST(request: Request) { const current = await currentUser(); if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); const body = await request.json().catch(() => null); if (!body?.subject?.trim() || !body?.details?.trim()) return NextResponse.json({ error: 'Subject and details are required.' }, { status: 400 }); const saved = await db.insert(feedbackRequests).values({ id: crypto.randomUUID(), userId: current.id, subject: String(body.subject).trim(), details: String(body.details).trim() }).returning(); return NextResponse.json(saved[0], { status: 201 }) }
+export async function DELETE(request: Request) { const current = await currentUser(); if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); const body = await request.json().catch(() => null); await db.delete(feedbackRequests).where(and(eq(feedbackRequests.id, String(body?.id || '')), eq(feedbackRequests.userId, current.id))); return NextResponse.json({ ok: true }) }
