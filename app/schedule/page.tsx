@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Plus, Trash2 } from 'lucide-react'
 const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 type Slot = { day: string; start: string; end: string }
@@ -14,8 +14,14 @@ export default function SchedulePage() {
   const [services, setServices] = useState<Service[]>([])
   const [newService, setNewService] = useState('')
   const [serviceEditorOpen, setServiceEditorOpen] = useState(false)
+  const hydrated = useRef(false)
   useEffect(() => { void load() }, [])
-  async function load() { const response = await fetch('/api/schedule', { cache: 'no-store' }); if (!response.ok) { setMessage('Unable to load schedule.'); return } const data = await response.json(); setSlots(data.slots ?? []); setServices(data.services ?? []) }
+  useEffect(() => {
+    if (!hydrated.current) return
+    const timer = window.setTimeout(() => { void save(slots) }, 700)
+    return () => window.clearTimeout(timer)
+  }, [slots])
+  async function load() { const response = await fetch('/api/schedule', { cache: 'no-store' }); if (!response.ok) { setMessage('Unable to load schedule.'); return } const data = await response.json(); setSlots(data.slots ?? []); setServices(data.services ?? []); hydrated.current = true }
   async function save(next: Slot[]) { const response = await fetch('/api/schedule', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slots: next }) }); setMessage(response.ok ? 'Schedule saved.' : 'Unable to save schedule.'); if (response.ok) setSlots(next) }
   async function add(day = 'Monday') { const next = [...slots, { day, start: '08:00', end: '17:00' }]; setSlots(next); await save(next) }
   async function saveService(service: Service) { const response = await fetch('/api/schedule', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(service) }); setMessage(response.ok ? 'Service price saved.' : 'Unable to save service price.'); if (response.ok) await load() }

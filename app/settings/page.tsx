@@ -31,6 +31,12 @@ export default function SettingsPage() {
     void load()
   }, [])
 
+  useEffect(() => {
+    if (loading) return
+    const timer = window.setTimeout(() => { void save() }, 700)
+    return () => window.clearTimeout(timer)
+  }, [profile.clinic_name, profile.address, profile.state, profile.lga, loading])
+
   async function save() {
     setSaving(true)
     const response = await fetch('/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: profile.clinic_name, address: profile.address, state: profile.state, lga: profile.lga }) })
