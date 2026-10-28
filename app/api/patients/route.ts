@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   const current = await currentUser()
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => null)
-  if (!body?.name || !body?.species || !body?.ownerName) return NextResponse.json({ error: 'Name, species, and owner name are required.' }, { status: 400 })
-  const row = { id: crypto.randomUUID(), userId: current.id, name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null }
+  if (!String(body?.name || '').trim() || !String(body?.species || '').trim() || !String(body?.ownerName || '').trim()) return NextResponse.json({ error: 'Name, species, and owner name are required.' }, { status: 400 })
+  const row = { id: crypto.randomUUID(), userId: current.id, name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null, notes: body.notes ? String(body.notes) : null, diagnosis: body.diagnosis ? String(body.diagnosis) : null, treatmentPlan: body.treatmentPlan ? String(body.treatmentPlan) : null, visitNotes: body.visitNotes ? String(body.visitNotes) : null }
   await db.insert(pets).values(row)
   return NextResponse.json(row, { status: 201 })
 }
