@@ -23,8 +23,13 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   if (!String(body?.name || '').trim() || !String(body?.species || '').trim() || !String(body?.ownerName || '').trim()) return NextResponse.json({ error: 'Name, species, and owner name are required.' }, { status: 400 })
   const row = { id: crypto.randomUUID(), userId: current.id, name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null, notes: body.notes ? String(body.notes) : null, diagnosis: body.diagnosis ? String(body.diagnosis) : null, treatmentPlan: body.treatmentPlan ? String(body.treatmentPlan) : null, visitNotes: body.visitNotes ? String(body.visitNotes) : null }
-  await db.insert(pets).values(row)
-  return NextResponse.json(row, { status: 201 })
+  try {
+    const [saved] = await db.insert(pets).values(row).returning()
+    return NextResponse.json(saved ?? row, { status: 201 })
+  } catch (error) {
+    console.error('[v0] patient create failed', error)
+    return NextResponse.json({ error: 'Unable to save patient record.' }, { status: 500 })
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -32,6 +37,12 @@ export async function PATCH(request: Request) {
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => null)
   if (!body?.id) return NextResponse.json({ error: 'Patient id is required.' }, { status: 400 })
-  const result = await db.update(pets).set({ name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null, notes: body.notes ? String(body.notes) : undefined, diagnosis: body.diagnosis ? String(body.diagnosis) : undefined, treatmentPlan: body.treatmentPlan ? String(body.treatmentPlan) : undefined, visitNotes: body.visitNotes ? String(body.visitNotes) : undefined }).where(and(eq(pets.id, String(body.id)), eq(pets.userId, current.id))).returning()
+  let result
+  try {
+    result = await db.update(pets).set({ name: String(body.name).trim(), species: String(body.species).trim(), breed: body.breed ? String(body.breed).trim() : null, ownerName: String(body.ownerName).trim(), weight: body.weight ? String(body.weight).trim() : null, notes: body.notes ? String(body.notes) : undefined, diagnosis: body.diagnosis ? String(body.diagnosis) : undefined, treatmentPlan: body.treatmentPlan ? String(body.treatmentPlan) : undefined, visitNotes: body.visitNotes ? String(body.visitNotes) : undefined }).where(and(eq(pets.id, String(body.id)), eq(pets.userId, current.id))).returning()
+  } catch (error) {
+    console.error('[v0] patient update failed', error)
+    return NextResponse.json({ error: 'Unable to update patient record.' }, { status: 500 })
+  }
   return result[0] ? NextResponse.json(result[0]) : NextResponse.json({ error: 'Patient not found.' }, { status: 404 })
 }
