@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Bell, Building2, CalendarDays, Save, Unplug } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     async function load() {
@@ -30,6 +32,12 @@ export default function SettingsPage() {
     }
     void load()
   }, [])
+
+  useEffect(() => {
+    const calendar = searchParams.get('calendar')
+    if (calendar === 'connected') setNotice({ type: 'success', text: 'Google Calendar connected successfully.' })
+    if (calendar === 'error') setNotice({ type: 'error', text: `Google Calendar connection failed${searchParams.get('reason') ? `: ${searchParams.get('reason')}` : '.'}` })
+  }, [searchParams])
 
   useEffect(() => {
     if (loading) return
