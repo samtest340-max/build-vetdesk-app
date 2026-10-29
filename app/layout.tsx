@@ -2,7 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { DashboardShell } from '@/components/dashboard-shell'
-import { PwaInstallButton } from '@/components/pwa-install-button'
+import { InstallBanner } from '@/components/install-banner'
 import { OfflineStatus } from '@/components/offline-status'
 
 export const metadata: Metadata = {
@@ -30,10 +30,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <OfflineStatus />
-        <div className="install-banner flex min-h-16 items-center justify-end gap-4 border-b border-teal-100 bg-[#f0fdfa] px-4 py-3 sm:px-6 lg:px-10"><div className="install-promo hidden items-center gap-3 sm:flex" aria-hidden="true"><span className="install-promo-dot" /><div><p className="text-sm font-extrabold text-blue-950">Keep VetDesk close</p><p className="text-xs text-blue-700">Install once. Open your practice dashboard faster.</p></div><span className="install-promo-arrow">→</span></div><PwaInstallButton /></div>
+        <InstallBanner />
         <DashboardShell>{children}</DashboardShell>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
