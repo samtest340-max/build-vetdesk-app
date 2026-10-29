@@ -7,7 +7,7 @@
   "background_color": "#f0fdfa",
   "theme_color": "#0f766e",
   "icons": [
-    { "src": "/icon-light-32x32.png", "sizes": "32x32", "type": "image/png" },
-    { "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }
+{ "src": "/vetdesk-favicon.png", "sizes": "32x32", "type": "image/png" },
+ { "src": "/vetdesk-favicon.png", "sizes": "180x180", "type": "image/png" }
   ]
 }
