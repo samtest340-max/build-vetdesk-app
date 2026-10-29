@@ -9,15 +9,14 @@ import {
   ChevronDown,
   FileText,
   Menu,
-  Moon,
   PawPrint,
   ShieldCheck,
   Sparkles,
-  Sun,
   Users,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const features = [
   { icon: CalendarDays, title: 'Online Appointments', text: 'Let pet owners book and manage appointments with ease.' },
@@ -33,13 +32,12 @@ const faqs = [
 ]
 
 export default function Page() {
-  const [dark, setDark] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(0)
   const navItems = [['Features', '#features'], ['Pricing', '#pricing'], ['About', '#about'], ['FAQs', '#faq']]
 
   return (
-    <div className={dark ? 'dark min-h-screen bg-slate-950 text-white' : 'min-h-screen bg-white text-slate-950'}>
+    <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 lg:px-8">
           <a href="#top" className="flex items-center gap-2.5" aria-label="VetDesk home">
@@ -50,7 +48,7 @@ export default function Page() {
             {navItems.map(([label, href]) => <a key={label} href={href} className="text-sm font-medium text-slate-700 transition hover:text-blue-700 dark:text-slate-300">{label}</a>)}
           </nav>
           <div className="hidden items-center gap-3 md:flex">
-            <button onClick={() => setDark(!dark)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Toggle dark mode">{dark ? <Sun /> : <Moon />}</button>
+            <ThemeToggle />
 <a href="/sign-in" className="px-3 text-sm font-medium text-slate-700 dark:text-slate-300">Log in</a>
   <a href="/sign-up" className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-blue-700 px-5 text-sm font-medium text-white hover:bg-blue-800">Get Started Free <ArrowRight data-icon="inline-end" /></a>
           </div>
