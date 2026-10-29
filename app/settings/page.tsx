@@ -1,22 +1,20 @@
 'use client'
 
 import Link from 'next/link'
-import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { Bell, Building2, CalendarDays, Save, Unplug } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 type Notice = { type: 'success' | 'error'; text: string }
 type Profile = { clinic_name: string; address: string; state: string; lga: string; reminder_preferences: Record<string, boolean> }
 
-function SettingsPageContent() {
+export default function SettingsPage() {
   const [tab, setTab] = useState<'Practice' | 'Notifications'>('Practice')
   const [profile, setProfile] = useState<Profile>({ clinic_name: '', address: '', state: '', lga: '', reminder_preferences: {} })
   const [calendarEmail, setCalendarEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const searchParams = useSearchParams()
 
   useEffect(() => {
     async function load() {
@@ -34,10 +32,11 @@ function SettingsPageContent() {
   }, [])
 
   useEffect(() => {
-    const calendar = searchParams.get('calendar')
+    const params = new URLSearchParams(window.location.search)
+    const calendar = params.get('calendar')
     if (calendar === 'connected') setNotice({ type: 'success', text: 'Google Calendar connected successfully.' })
-    if (calendar === 'error') setNotice({ type: 'error', text: `Google Calendar connection failed${searchParams.get('reason') ? `: ${searchParams.get('reason')}` : '.'}` })
-  }, [searchParams])
+    if (calendar === 'error') setNotice({ type: 'error', text: `Google Calendar connection failed${params.get('reason') ? `: ${params.get('reason')}` : '.'}` })
+  }, [])
 
   useEffect(() => {
     if (loading) return
@@ -63,6 +62,3 @@ function SettingsPageContent() {
   </>}
 }
 
-export default function SettingsPage() {
-  return <Suspense fallback={<main className="min-h-screen bg-slate-50 p-10"><div className="mx-auto max-w-5xl animate-pulse space-y-4"><div className="h-10 w-48 rounded bg-slate-200" /><div className="h-64 rounded-2xl bg-white" /></div></main>}><SettingsPageContent /></Suspense>
-}
