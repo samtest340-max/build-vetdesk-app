@@ -4,6 +4,7 @@ import './globals.css'
 import { DashboardShell } from '@/components/dashboard-shell'
 import { InstallBanner } from '@/components/install-banner'
 import { OfflineStatus } from '@/components/offline-status'
+import { ThemeProvider } from '@/components/theme-provider'
 
 export const metadata: Metadata = {
   title: 'VetDesk — Run your vet practice. Fill your calendar.',
@@ -32,10 +33,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <OfflineStatus />
-        <InstallBanner />
-        <DashboardShell>{children}</DashboardShell>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <OfflineStatus />
+          <InstallBanner />
+          <DashboardShell>{children}</DashboardShell>
+          {process.env.NODE_ENV === 'production' && <Analytics />}
+        </ThemeProvider>
       </body>
     </html>
   )
