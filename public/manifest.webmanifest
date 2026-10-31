@@ -2,12 +2,18 @@
   "name": "VetDesk",
   "short_name": "VetDesk",
   "description": "Run your veterinary practice and fill your calendar.",
-  "start_url": "/dashboard",
+  "id": "/",
+  "scope": "/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f0fdfa",
   "theme_color": "#0f766e",
   "icons": [
-{ "src": "/vetdesk-favicon.png", "sizes": "32x32", "type": "image/png" },
- { "src": "/vetdesk-favicon.png", "sizes": "180x180", "type": "image/png" }
+    {
+      "src": "/vetdesk-favicon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
