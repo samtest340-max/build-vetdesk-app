@@ -3,7 +3,6 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { emailLog } from '@/lib/db/schema'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const from = process.env.EMAIL_FROM || 'VetDesk <onboarding@resend.dev>'
 
 function layout(title: string, body: string, action?: { label: string; href: string }) {
@@ -15,6 +14,7 @@ export async function sendTransactionalEmail(input: { to: string; subject: strin
     const existing = await db.select({ id: emailLog.id }).from(emailLog).where(eq(emailLog.eventKey, input.eventKey)).limit(1)
     if (existing[0]) return { ok: true, duplicate: true }
     if (!process.env.RESEND_API_KEY) { console.error('[email] RESEND_API_KEY is missing'); return { ok: false } }
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const result = await resend.emails.send({ from, to: [input.to], subject: input.subject, html: layout(input.title, input.body, input.action), text: `${input.text}\n\nThis is an automated message. Please do not reply.` }, { idempotencyKey: input.eventKey })
     if (result.error) { console.error('[email] Failed to send', input.eventKey, result.error.message); return { ok: false } }
     await db.insert(emailLog).values({ id: crypto.randomUUID(), userId: input.userId, eventKey: input.eventKey, recipient: input.to, subject: input.subject })

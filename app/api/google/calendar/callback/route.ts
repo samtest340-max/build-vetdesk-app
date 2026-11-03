@@ -14,11 +14,17 @@ export async function GET(request: Request) {
   const oauthError = url.searchParams.get('error'); if (oauthError) return NextResponse.redirect(new URL(`/settings?calendar=error&reason=${encodeURIComponent(oauthError)}`, request.url)); if (!code || !state || state !== cookieStore.get('google_oauth_state')?.value) return NextResponse.redirect(new URL('/settings?calendar=error', request.url))
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return NextResponse.redirect(new URL('/sign-in', request.url))
-  const clientId = process.env.GOOGLE_CLIENT_ID || '545512968755-vuncsev9lm0e5me82fv3856omijjceaa.apps.googleusercontent.com'
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  if (!clientId || !clientSecret) return NextResponse.redirect(new URL('/settings?calendar=unavailable', request.url))
   const stableOrigin = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : url.origin
   const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? `${stableOrigin}/api/google/calendar/callback`
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code, client_id: clientId, client_secret: process.env.API_KEY ?? '', redirect_uri: redirectUri, grant_type: 'authorization_code' }) })
-  if (!tokenResponse.ok) return NextResponse.redirect(new URL('/settings?calendar=error&reason=token_exchange', request.url))
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }) })
+  if (!tokenResponse.ok) {
+    const errorBody = await tokenResponse.json().catch(() => null) as { error?: string } | null
+    const reason = errorBody?.error === 'invalid_grant' ? 'authorization_expired' : 'token_exchange'
+    return NextResponse.redirect(new URL(`/settings?calendar=error&reason=${reason}`, request.url))
+  }
   const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string }
   if (!token.access_token) return NextResponse.redirect(new URL('/settings?calendar=error', request.url))
   const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { authorization: `Bearer ${token.access_token}` } })
