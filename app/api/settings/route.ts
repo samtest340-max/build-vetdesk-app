@@ -13,8 +13,8 @@ async function currentUser() {
 export async function GET() {
   const current = await currentUser()
   if (!current) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const [clinic, calendar] = await Promise.all([db.select().from(clinics).where(eq(clinics.ownerId, current.id)).limit(1), db.select({ email: googleCalendarConnections.googleUserEmail }).from(googleCalendarConnections).where(eq(googleCalendarConnections.userId, current.id)).limit(1)])
-  return NextResponse.json({ clinic: clinic[0] ?? null, calendarEmail: calendar[0]?.email ?? null, remindersEnabled: true })
+  const [clinic, calendar] = await Promise.all([db.select().from(clinics).where(eq(clinics.ownerId, current.id)).limit(1), db.select({ id: googleCalendarConnections.id, email: googleCalendarConnections.googleUserEmail }).from(googleCalendarConnections).where(eq(googleCalendarConnections.userId, current.id)).limit(1)])
+  return NextResponse.json({ clinic: clinic[0] ?? null, calendarConnected: Boolean(calendar[0]), calendarEmail: calendar[0]?.email ?? null, remindersEnabled: true })
 }
 
 export async function PUT(request: Request) {

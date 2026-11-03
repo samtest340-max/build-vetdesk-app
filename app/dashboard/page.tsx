@@ -30,7 +30,7 @@ export default function DashboardPage() {
     setPublicLink(`${window.location.origin}${linkData.url || `/book/${user.id}`}`)
     if (appointmentResponse.ok) setAppointments(await appointmentResponse.json())
     if (patientResponse.ok) setPatientCount((await patientResponse.json()).length)
-    if (settingsResponse.ok) setCalendarConnected(Boolean((await settingsResponse.json()).calendarEmail))
+    if (settingsResponse.ok) setCalendarConnected(Boolean((await settingsResponse.json()).calendarConnected))
     setLoading(false)
   }
 
