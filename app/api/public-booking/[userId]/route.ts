@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { eq, and, ne, gte, lt } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { appointments, pets, services, user, vetProfiles } from '@/lib/db/schema'
-import { lagosDateKey, validateBooking } from '@/lib/appointments/booking-rules'
+import { appointments, pets, services, user, userSettings, vetProfiles } from '@/lib/db/schema'
+import { lagosDateKey, validateBooking, type AvailabilitySlot } from '@/lib/appointments/booking-rules'
 import { sendTransactionalEmail } from '@/lib/email'
 
 const defaultServices = [
@@ -16,14 +16,15 @@ export async function GET(_request: Request, context: { params: Promise<{ userId
   const ownerById = await db.select({ id: user.id, name: user.name, email: user.email, publicSlug: user.publicSlug }).from(user).where(eq(user.id, rawUserId)).limit(1)
   const ownerBySlug = ownerById[0] ? ownerById : await db.select({ id: user.id, name: user.name, email: user.email, publicSlug: user.publicSlug }).from(user).where(eq(user.publicSlug, rawUserId)).limit(1)
   const userId = ownerBySlug[0]?.id || rawUserId
-  const [owner, profile, serviceRows] = await Promise.all([
+  const [owner, profile, serviceRows, settings] = await Promise.all([
     ownerBySlug,
     db.select({ fullName: vetProfiles.fullName, clinicName: vetProfiles.clinicName, specialization: vetProfiles.specialization, profilePhotoUrl: vetProfiles.profilePhotoUrl }).from(vetProfiles).where(eq(vetProfiles.userId, userId)).limit(1),
     db.select().from(services).where(eq(services.userId, userId)).orderBy(services.name),
+    db.select({ availability: userSettings.availability }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1),
   ])
   if (!owner[0]) return NextResponse.json({ error: 'Booking page not found.' }, { status: 404 })
   const upcoming = await db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(eq(appointments.userId, userId), ne(appointments.status, 'cancelled'), gte(appointments.startsAt, new Date())))
-  return NextResponse.json({ profile: { full_name: profile[0]?.fullName || owner[0].name, clinic_name: profile[0]?.clinicName || null, specialization: profile[0]?.specialization || null, profile_photo_url: profile[0]?.profilePhotoUrl || null }, blockedSlots: upcoming.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })), services: serviceRows.length ? serviceRows : defaultServices })
+  return NextResponse.json({ profile: { full_name: profile[0]?.fullName || owner[0].name, clinic_name: profile[0]?.clinicName || null, specialization: profile[0]?.specialization || null, profile_photo_url: profile[0]?.profilePhotoUrl || null }, blockedSlots: upcoming.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })), availability: settings[0]?.availability ?? [], services: serviceRows.length ? serviceRows : defaultServices })
 }
 
 export async function POST(request: Request, context: { params: Promise<{ userId: string }> }) {
@@ -37,8 +38,11 @@ export async function POST(request: Request, context: { params: Promise<{ userId
   const startsAt = new Date(body.startsAt)
   if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) return NextResponse.json({ error: 'Choose a future date and time.' }, { status: 400 })
   const dateKey = lagosDateKey(startsAt)
-  const existing = await db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(eq(appointments.userId, userId), ne(appointments.status, 'cancelled'), gte(appointments.startsAt, new Date(`${dateKey}T00:00:00+01:00`)), lt(appointments.startsAt, new Date(`${dateKey}T23:59:59+01:00`))))
-  if (!validateBooking(dateKey, startsAt.toISOString(), existing.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })))) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
+  const [existing, settings] = await Promise.all([
+    db.select({ id: appointments.id, startsAt: appointments.startsAt, status: appointments.status }).from(appointments).where(and(eq(appointments.userId, userId), ne(appointments.status, 'cancelled'), gte(appointments.startsAt, new Date(`${dateKey}T00:00:00+01:00`)), lt(appointments.startsAt, new Date(`${dateKey}T23:59:59+01:00`)))),
+    db.select({ availability: userSettings.availability }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1),
+  ])
+  if (!validateBooking(dateKey, startsAt.toISOString(), existing.map(item => ({ id: item.id, starts_at: item.startsAt.toISOString(), status: item.status })), undefined, (settings[0]?.availability as AvailabilitySlot[] | undefined) ?? [])) return NextResponse.json({ error: 'This time is no longer available, please choose another.' }, { status: 409 })
   const petId = crypto.randomUUID()
   await db.insert(pets).values({ id: petId, userId, name: String(body.petName || `${body.name}'s booking`), species: String(body.species || 'Pending profile'), breed: body.breed ? String(body.breed) : null, ownerName: body.name, weight: body.weight ? String(body.weight) : null, notes: JSON.stringify({ pending: true, ownerEmail: body.email, ownerPhone: body.phone || null }) })
   const appointmentId = crypto.randomUUID()
